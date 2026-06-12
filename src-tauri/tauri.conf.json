@@ -1,7 +1,7 @@
 {
-  "productName": "soundZ",
+  "productName": "LightCutSoundZ",
   "version": "0.1.0",
-  "identifier": "dev.soundz",
+  "identifier": "dev.lightcutsoundz",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "soundZ",
+        "title": "LightCutSoundZ",
         "width": 960,
         "height": 700,
         "resizable": true,

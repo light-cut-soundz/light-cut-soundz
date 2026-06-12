@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LightCutSoundZ — Desktop Audio Editor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --border: #2a2a4a;
+      --purple: #7c3aed;
+      --purple-light: #9d5cf6;
+      --purple-glow: rgba(124, 58, 237, 0.25);
+      --text: #e2e2f0;
+      --muted: #888899;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Nav ── */
+    nav {
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .nav-logo span { color: var(--purple-light); }
+    .nav-link {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      transition: color .15s;
+    }
+    .nav-link:hover { color: var(--text); }
+
+    /* ── Hero ── */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 5rem 2rem 3rem;
+      gap: 1.5rem;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--purple-glow);
+      border: 1px solid var(--purple);
+      border-radius: 999px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.75rem;
+      color: var(--purple-light);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+    }
+    .hero h1 span { color: var(--purple-light); }
+
+    .hero p {
+      max-width: 540px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    /* ── Features pills ── */
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      max-width: 580px;
+    }
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ── Download grid ── */
+    .download-section {
+      padding: 0 2rem 5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .download-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+    }
+
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .dl-card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.6rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color .15s, box-shadow .15s, transform .1s;
+    }
+    .dl-card:hover {
+      border-color: var(--purple);
+      box-shadow: 0 0 0 1px var(--purple), 0 4px 20px var(--purple-glow);
+      transform: translateY(-1px);
+    }
+
+    .dl-icon { font-size: 1.75rem; line-height: 1; }
+
+    .dl-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--purple-light);
+    }
+
+    .dl-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .dl-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .dl-btn {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--purple-light);
+    }
+    .dl-btn svg { flex-shrink: 0; }
+
+    .releases-link {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--border);
+      padding-bottom: 1px;
+      transition: color .15s;
+    }
+    .releases-link:hover { color: var(--text); }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1.5rem 2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .download-grid { grid-template-columns: 1fr 1fr; }
+      footer { flex-direction: column; gap: 0.5rem; text-align: center; }
+    }
+    @media (max-width: 400px) {
+      .download-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">LightCut<span>SoundZ</span></div>
+  <a class="nav-link" href="https://github.com/sindus/light-cut-soundz">GitHub →</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+      <circle cx="5" cy="5" r="5"/>
+    </svg>
+    Free &amp; Open Source
+  </div>
+
+  <h1>LightCut<span>SoundZ</span></h1>
+
+  <p>A fast, minimal desktop audio editor. Trim, fade, normalize, change speed, apply filters — then export in any format.</p>
+
+  <div class="features">
+    <span class="pill">✂️ Trim</span>
+    <span class="pill">🌊 Fade in / out</span>
+    <span class="pill">📊 Normalize</span>
+    <span class="pill">⚡ Speed change</span>
+    <span class="pill">🎛️ Filters (LP / HP / BP)</span>
+    <span class="pill">💾 WAV · MP3 · FLAC · OGG</span>
+  </div>
+</section>
+
+<section class="download-section">
+  <p class="download-title">Download — v0.1.0</p>
+
+  <div class="download-grid">
+
+    <a class="dl-card"
+       href="https://github.com/sindus/light-cut-soundz/releases/latest/download/LightCutSoundZ_aarch64.dmg">
+      <div class="dl-icon">🍎</div>
+      <div class="dl-label">macOS</div>
+      <div class="dl-title">Apple Silicon</div>
+      <div class="dl-sub">M1 · M2 · M3 · M4 — .dmg</div>
+      <div class="dl-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Télécharger
+      </div>
+    </a>
+
+    <a class="dl-card"
+       href="https://github.com/sindus/light-cut-soundz/releases/latest/download/LightCutSoundZ_x64.dmg">
+      <div class="dl-icon">💻</div>
+      <div class="dl-label">macOS</div>
+      <div class="dl-title">Intel</div>
+      <div class="dl-sub">x86_64 — .dmg</div>
+      <div class="dl-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Télécharger
+      </div>
+    </a>
+
+    <a class="dl-card"
+       href="https://github.com/sindus/light-cut-soundz/releases/latest/download/LightCutSoundZ_amd64.AppImage">
+      <div class="dl-icon">🐧</div>
+      <div class="dl-label">Linux</div>
+      <div class="dl-title">AppImage</div>
+      <div class="dl-sub">x86_64 — portable</div>
+      <div class="dl-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Télécharger
+      </div>
+    </a>
+
+    <a class="dl-card"
+       href="https://github.com/sindus/light-cut-soundz/releases/latest/download/light-cut-soundz_amd64.deb">
+      <div class="dl-icon">📦</div>
+      <div class="dl-label">Linux</div>
+      <div class="dl-title">Debian / Ubuntu</div>
+      <div class="dl-sub">x86_64 — .deb</div>
+      <div class="dl-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Télécharger
+      </div>
+    </a>
+
+  </div>
+
+  <a class="releases-link"
+     href="https://github.com/sindus/light-cut-soundz/releases">
+    Voir toutes les versions →
+  </a>
+</section>
+
+<footer>
+  <span>LightCutSoundZ — MIT License</span>
+  <a href="https://github.com/sindus/light-cut-soundz">sindus/light-cut-soundz</a>
+</footer>
+
+</body>
+</html>

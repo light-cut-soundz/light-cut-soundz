@@ -34,9 +34,14 @@ function setupAudio(path) {
   const url = convertFileSrc(path)
   audioEl = new Audio(url)
   audioEl.addEventListener('ended', () => { setPlaying(false); renderWaveform() })
+  audioEl.addEventListener('error', () => {
+    const msg = audioEl.error?.message || 'format non supporté'
+    showToast(`Erreur audio : ${msg}`, 'error')
+    setPlaying(false)
+  })
 }
 
-function togglePlay() {
+async function togglePlay() {
   if (!audioEl) return
   if (audioEl.paused) {
     const trimEnabled = $('trim-enabled').checked
@@ -45,9 +50,13 @@ function togglePlay() {
     if (trimEnabled && (audioEl.currentTime < start || audioEl.currentTime >= end)) {
       audioEl.currentTime = start
     }
-    audioEl.play()
-    setPlaying(true)
-    tickPlayhead()
+    try {
+      await audioEl.play()
+      setPlaying(true)
+      tickPlayhead()
+    } catch (err) {
+      showToast('Lecture impossible : ' + err.message, 'error')
+    }
   } else {
     audioEl.pause()
     setPlaying(false)
