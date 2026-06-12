@@ -25,21 +25,35 @@ const toast     = $('toast')
 
 // ─── Audio playback (Web Audio API) ─────────────────────────────────────────
 
-let audioCtx = null
-let audioBuffer = null
-let audioSource = null
+let audioCtx         = null
+let audioBuffer      = null
+let audioPeak        = 1.0   // cached peak amplitude
+let audioSource      = null
+let fadeGainNode     = null
+let filterNode       = null
+let normalizeGainNode = null
 let playStartCtxTime = 0
-let playStartOffset = 0
-let playRaf = null
+let playStartOffset  = 0
+let playRaf          = null
 
 async function setupAudio(path) {
   stopPlayback()
   audioBuffer = null
+  audioPeak   = 1.0
   playStartOffset = 0
 
   const data = await invoke('get_audio_pcm', { path })
 
-  if (!audioCtx) audioCtx = new AudioContext()
+  if (!audioCtx) {
+    audioCtx = new AudioContext()
+    // Build persistent processing chain: source → fade → filter → normalize → out
+    fadeGainNode      = audioCtx.createGain()
+    filterNode        = audioCtx.createBiquadFilter()
+    normalizeGainNode = audioCtx.createGain()
+    fadeGainNode.connect(filterNode)
+    filterNode.connect(normalizeGainNode)
+    normalizeGainNode.connect(audioCtx.destination)
+  }
   if (audioCtx.state === 'suspended') await audioCtx.resume()
 
   const ab = audioCtx.createBuffer(data.channels, data.samples[0].length, data.sample_rate)
@@ -47,11 +61,26 @@ async function setupAudio(path) {
     ab.copyToChannel(new Float32Array(data.samples[ch]), ch)
   }
   audioBuffer = ab
+
+  // Compute peak once for normalize preview
+  audioPeak = 0
+  for (let ch = 0; ch < ab.numberOfChannels; ch++) {
+    const d = ab.getChannelData(ch)
+    for (let i = 0; i < d.length; i++) {
+      const a = Math.abs(d[i])
+      if (a > audioPeak) audioPeak = a
+    }
+  }
+
+  applyPreviewSettings()
 }
 
 function currentPlaybackTime() {
   if (!audioCtx || !audioSource) return playStartOffset
-  return Math.min(playStartOffset + (audioCtx.currentTime - playStartCtxTime), audioBuffer?.duration ?? 0)
+  return Math.min(
+    playStartOffset + (audioCtx.currentTime - playStartCtxTime),
+    audioBuffer?.duration ?? 0
+  )
 }
 
 function isPlaying() { return audioSource !== null }
@@ -61,9 +90,10 @@ function startPlayback(offset) {
   stopPlayback()
   audioSource = audioCtx.createBufferSource()
   audioSource.buffer = audioBuffer
-  audioSource.connect(audioCtx.destination)
-  playStartOffset = Math.max(0, Math.min(offset, audioBuffer.duration))
+  audioSource.connect(fadeGainNode)
+  playStartOffset  = Math.max(0, Math.min(offset, audioBuffer.duration))
   playStartCtxTime = audioCtx.currentTime
+  applyPreviewSettings()
   audioSource.start(0, playStartOffset)
   audioSource.onended = () => {
     audioSource = null
@@ -80,6 +110,56 @@ function stopPlayback() {
   audioSource.stop()
   audioSource.disconnect()
   audioSource = null
+}
+
+// Apply all preview effects to the Web Audio node chain
+function applyPreviewSettings() {
+  if (!audioCtx) return
+
+  // Speed
+  if (audioSource) {
+    audioSource.playbackRate.value = parseFloat($('speed').value)
+  }
+
+  // Normalize
+  if (normalizeGainNode) {
+    normalizeGainNode.gain.value =
+      ($('normalize').checked && audioPeak > 1e-8) ? 1.0 / audioPeak : 1.0
+  }
+
+  // Filter
+  if (filterNode) {
+    const ft = $('filter-type').value
+    if (ft === '') {
+      filterNode.type = 'allpass'
+    } else {
+      const freq  = Math.max(1, Math.min(parseFloat($('filter-freq').value) || 1000, (audioCtx.sampleRate / 2) - 1))
+      filterNode.frequency.value = freq
+      if (ft === 'lowpass') {
+        filterNode.type = 'lowpass'
+        filterNode.Q.value = 0.7071
+      } else if (ft === 'highpass') {
+        filterNode.type = 'highpass'
+        filterNode.Q.value = 0.7071
+      } else if (ft === 'bandpass') {
+        const bw = parseFloat($('filter-bw').value) || 500
+        filterNode.type = 'bandpass'
+        filterNode.Q.value = bw > 0 ? freq / bw : 1.0
+      }
+    }
+  }
+}
+
+// Update fade gain in the animation loop based on current playback position
+function updateFadeGain(t) {
+  if (!fadeGainNode || !state.info) return
+  const duration = state.info.duration
+  const fadeIn   = parseFloat($('fadein').value)  || 0
+  const fadeOut  = parseFloat($('fadeout').value) || 0
+  let gain = 1.0
+  if (fadeIn  > 0 && t < fadeIn)              gain = Math.min(gain, t / fadeIn)
+  if (fadeOut > 0 && t > duration - fadeOut)  gain = Math.min(gain, (duration - t) / fadeOut)
+  fadeGainNode.gain.value = Math.max(0, gain)
 }
 
 function togglePlay() {
@@ -104,6 +184,7 @@ function tickPlayhead() {
   function frame() {
     if (!isPlaying()) return
     const t = currentPlaybackTime()
+    updateFadeGain(t)
     const trimEnabled = $('trim-enabled').checked
     const end = parseFloat($('trim-end').value) || state.info?.duration || 0
     if (trimEnabled && t >= end) {
@@ -178,19 +259,16 @@ function renderWaveform() {
   if (trimEnabled && duration > 0) {
     for (const [t, label] of [[trimStart, 'start'], [trimEnd, 'end']]) {
       const hx = Math.round((t / duration) * W)
-      // line
       ctx.strokeStyle = '#9d5cf6'
       ctx.lineWidth = 2
       ctx.setLineDash([])
       ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, H); ctx.stroke()
-      // grab tab at top
       ctx.fillStyle = '#7c3aed'
       const tabW = 12, tabH = 20
       const tabX = label === 'start' ? hx : hx - tabW
       ctx.beginPath()
       ctx.roundRect(tabX, 0, tabW, tabH, [0, 0, 4, 4])
       ctx.fill()
-      // arrow hint inside tab
       ctx.fillStyle = 'rgba(255,255,255,0.8)'
       ctx.beginPath()
       if (label === 'start') {
@@ -229,8 +307,7 @@ function getHandleAtX(clientX) {
 
 canvas.addEventListener('mousemove', (e) => {
   if (dragging) return
-  const handle = getHandleAtX(e.clientX)
-  canvas.classList.toggle('cursor-resize', !!handle)
+  canvas.classList.toggle('cursor-resize', !!getHandleAtX(e.clientX))
 })
 
 canvas.addEventListener('mouseleave', () => {
@@ -281,13 +358,18 @@ $('trim-enabled').addEventListener('change', renderWaveform)
 $('trim-start').addEventListener('input', renderWaveform)
 $('trim-end').addEventListener('input', renderWaveform)
 
-$('fadein').addEventListener('input',  () => { $('fadein-val').textContent  = parseFloat($('fadein').value).toFixed(1) + 's' })
-$('fadeout').addEventListener('input', () => { $('fadeout-val').textContent = parseFloat($('fadeout').value).toFixed(1) + 's' })
+$('fadein').addEventListener('input', () => {
+  $('fadein-val').textContent = parseFloat($('fadein').value).toFixed(1) + 's'
+})
+$('fadeout').addEventListener('input', () => {
+  $('fadeout-val').textContent = parseFloat($('fadeout').value).toFixed(1) + 's'
+})
 
 $('speed').addEventListener('input', () => {
   const v = parseFloat($('speed').value)
   $('speed-val').textContent = v.toFixed(2) + '×'
   document.querySelectorAll('.preset').forEach(b => b.classList.toggle('active', parseFloat(b.dataset.v) === v))
+  applyPreviewSettings()
 })
 document.querySelectorAll('.preset').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -295,15 +377,21 @@ document.querySelectorAll('.preset').forEach(btn => {
     $('speed').value = v
     $('speed-val').textContent = v.toFixed(2) + '×'
     document.querySelectorAll('.preset').forEach(b => b.classList.toggle('active', b === btn))
+    applyPreviewSettings()
   })
 })
+
+$('normalize').addEventListener('change', applyPreviewSettings)
 
 $('filter-type').addEventListener('change', () => {
   const t = $('filter-type').value
   $('filter-params').classList.toggle('hidden', t === '')
   $('filter-bw-row').style.display = t === 'bandpass' ? 'flex' : 'none'
   $('filter-freq-label').textContent = t === 'bandpass' ? 'Centre' : 'Coupure'
+  applyPreviewSettings()
 })
+$('filter-freq').addEventListener('input', applyPreviewSettings)
+$('filter-bw').addEventListener('input', applyPreviewSettings)
 
 document.querySelectorAll('.fmt').forEach(btn => {
   btn.addEventListener('click', () => {
