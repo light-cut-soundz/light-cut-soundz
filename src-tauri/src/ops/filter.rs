@@ -1,6 +1,6 @@
 use crate::audio::AudioBuffer;
 use anyhow::{bail, Result};
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_1_SQRT_2, PI};
 
 #[derive(Clone)]
 struct Biquad {
@@ -30,7 +30,7 @@ impl Biquad {
                 sr / 2.0
             );
         }
-        let q = 0.7071067811865476; // 1/sqrt(2)
+        let q = FRAC_1_SQRT_2;
         let w0 = 2.0 * PI * cutoff_hz / sr;
         let cos_w0 = w0.cos();
         let alpha = w0.sin() / (2.0 * q);
@@ -59,7 +59,7 @@ impl Biquad {
                 sr / 2.0
             );
         }
-        let q = 0.7071067811865476;
+        let q = FRAC_1_SQRT_2;
         let w0 = 2.0 * PI * cutoff_hz / sr;
         let cos_w0 = w0.cos();
         let alpha = w0.sin() / (2.0 * q);
@@ -109,6 +109,7 @@ impl Biquad {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 pub enum FilterSpec {
     LowPass { cutoff_hz: f64 },
     HighPass { cutoff_hz: f64 },
