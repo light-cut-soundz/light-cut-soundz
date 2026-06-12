@@ -1,6 +1,8 @@
-use anyhow::{bail, Result};
-use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction};
 use crate::audio::AudioBuffer;
+use anyhow::{bail, Result};
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType, WindowFunction,
+};
 
 pub fn change_speed(buf: &mut AudioBuffer, factor: f64) -> Result<()> {
     if factor <= 0.0 {
@@ -21,13 +23,8 @@ pub fn change_speed(buf: &mut AudioBuffer, factor: f64) -> Result<()> {
     let chunk_size = 1024usize;
     let resample_ratio = 1.0 / factor;
 
-    let mut resampler = SincFixedIn::<f32>::new(
-        resample_ratio,
-        2.0,
-        params,
-        chunk_size,
-        buf.channels,
-    )?;
+    let mut resampler =
+        SincFixedIn::<f32>::new(resample_ratio, 2.0, params, chunk_size, buf.channels)?;
 
     let frames = buf.num_frames();
     let mut output: Vec<Vec<f32>> = vec![Vec::new(); buf.channels];

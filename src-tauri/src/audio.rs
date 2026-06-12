@@ -28,7 +28,10 @@ pub fn decode(path: &str) -> Result<AudioBuffer> {
     let mss = MediaSourceStream::new(Box::new(file), Default::default());
 
     let mut hint = Hint::new();
-    if let Some(ext) = std::path::Path::new(path).extension().and_then(|e| e.to_str()) {
+    if let Some(ext) = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+    {
         hint.with_extension(ext);
     }
 
@@ -51,10 +54,7 @@ pub fn decode(path: &str) -> Result<AudioBuffer> {
     let codec_params = track.codec_params.clone();
 
     let sample_rate = codec_params.sample_rate.context("Unknown sample rate")?;
-    let channels = codec_params
-        .channels
-        .map(|c| c.count())
-        .unwrap_or(2);
+    let channels = codec_params.channels.map(|c| c.count()).unwrap_or(2);
 
     let dec_opts = DecoderOptions::default();
     let mut decoder = symphonia::default::get_codecs()
@@ -82,8 +82,7 @@ pub fn decode(path: &str) -> Result<AudioBuffer> {
         match decoder.decode(&packet) {
             Ok(decoded) => {
                 let spec = *decoded.spec();
-                let mut sample_buf =
-                    SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
+                let mut sample_buf = SampleBuffer::<f32>::new(decoded.capacity() as u64, spec);
                 sample_buf.copy_interleaved_ref(decoded);
                 let samples = sample_buf.samples();
                 let n_ch = spec.channels.count();
@@ -115,8 +114,8 @@ pub fn encode_wav(buf: &AudioBuffer, path: &str) -> Result<()> {
         bits_per_sample: 32,
         sample_format: SampleFormat::Float,
     };
-    let mut writer = WavWriter::create(path, spec)
-        .with_context(|| format!("Cannot create WAV '{path}'"))?;
+    let mut writer =
+        WavWriter::create(path, spec).with_context(|| format!("Cannot create WAV '{path}'"))?;
 
     let frames = buf.num_frames();
     for f in 0..frames {
