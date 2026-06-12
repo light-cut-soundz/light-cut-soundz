@@ -73,7 +73,7 @@ jobs:
 
             ### Homebrew (macOS)
             ```
-            brew tap sindus/tap
+            brew tap light-cut-soundz/tap
             brew install --cask lightcutsoundz
             ```
           releaseDraft: false
@@ -96,7 +96,7 @@ jobs:
         run: |
           VERSION=${{ steps.ver.outputs.version }}
           gh release download "${{ github.ref_name }}" \
-            --repo sindus/light-cut-soundz \
+            --repo light-cut-soundz/light-cut-soundz \
             --pattern "LightCutSoundZ_${VERSION}_aarch64.dmg" \
             --pattern "LightCutSoundZ_${VERSION}_x64.dmg"
           echo "arm=$(sha256sum "LightCutSoundZ_${VERSION}_aarch64.dmg" | cut -d' ' -f1)" >> $GITHUB_OUTPUT
@@ -106,7 +106,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          git clone https://x-access-token:${GH_TOKEN}@github.com/sindus/homebrew-tap.git
+          git clone https://x-access-token:${GH_TOKEN}@github.com/light-cut-soundz/homebrew-tap.git
 
       - name: Write cask formula
         run: |
@@ -119,18 +119,18 @@ cask "lightcutsoundz" do
   version "VERSION_PLACEHOLDER"
 
   on_arm do
-    url "https://github.com/sindus/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_aarch64.dmg"
+    url "https://github.com/light-cut-soundz/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_aarch64.dmg"
     sha256 "SHA_ARM_PLACEHOLDER"
   end
 
   on_intel do
-    url "https://github.com/sindus/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_x64.dmg"
+    url "https://github.com/light-cut-soundz/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_x64.dmg"
     sha256 "SHA_INTEL_PLACEHOLDER"
   end
 
   name "LightCutSoundZ"
   desc "Fast, minimal desktop audio editor"
-  homepage "https://sindus.github.io/light-cut-soundz/"
+  homepage "https://light-cut-soundz.github.io/light-cut-soundz/"
 
   app "LightCutSoundZ.app"
 
