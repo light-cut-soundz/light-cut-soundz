@@ -1,6 +1,6 @@
 {
   "productName": "LightCutSoundZ",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "dev.lightcutsoundz",
   "build": {
     "beforeDevCommand": "npm run dev",
