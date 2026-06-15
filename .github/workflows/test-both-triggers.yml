@@ -1,0 +1,13 @@
+name: Test Both Triggers
+
+on:
+  push:
+    tags:
+      - 'test-*'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "it works"
