@@ -2,6 +2,9 @@ name: Ship Implementation
 
 on:
   workflow_call:
+    secrets:
+      GH_TOKEN:
+        required: false
 
 permissions:
   contents: write

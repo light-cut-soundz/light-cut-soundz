@@ -3,7 +3,11 @@ name: Fire Release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   call:
     uses: ./.github/workflows/ship-impl.yml
-    secrets: inherit
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
