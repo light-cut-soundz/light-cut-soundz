@@ -238,12 +238,11 @@
 </section>
 
 <section class="download-section">
-  <p class="download-title">Download — v0.1.0</p>
+  <p class="download-title" id="dl-version">Download — chargement…</p>
 
   <div class="download-grid">
 
-    <a class="dl-card"
-       href="https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/LightCutSoundZ_aarch64.dmg">
+    <a class="dl-card" id="dl-macos-arm" href="#">
       <div class="dl-icon">🍎</div>
       <div class="dl-label">macOS</div>
       <div class="dl-title">Apple Silicon</div>
@@ -258,8 +257,7 @@
       </div>
     </a>
 
-    <a class="dl-card"
-       href="https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/LightCutSoundZ_x64.dmg">
+    <a class="dl-card" id="dl-macos-intel" href="#">
       <div class="dl-icon">💻</div>
       <div class="dl-label">macOS</div>
       <div class="dl-title">Intel</div>
@@ -274,8 +272,7 @@
       </div>
     </a>
 
-    <a class="dl-card"
-       href="https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/LightCutSoundZ_amd64.AppImage">
+    <a class="dl-card" id="dl-linux-appimage" href="#">
       <div class="dl-icon">🐧</div>
       <div class="dl-label">Linux</div>
       <div class="dl-title">AppImage</div>
@@ -290,8 +287,7 @@
       </div>
     </a>
 
-    <a class="dl-card"
-       href="https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/light-cut-soundz_amd64.deb">
+    <a class="dl-card" id="dl-linux-deb" href="#">
       <div class="dl-icon">📦</div>
       <div class="dl-label">Linux</div>
       <div class="dl-title">Debian / Ubuntu</div>
@@ -313,6 +309,23 @@
     Voir toutes les versions →
   </a>
 </section>
+
+<script>
+(async () => {
+  try {
+    const res = await fetch('https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest');
+    const rel = await res.json();
+    document.getElementById('dl-version').textContent = 'Download — ' + rel.tag_name;
+    const find = (pat) => (rel.assets.find(a => pat.test(a.name)) || {}).browser_download_url || '#';
+    document.getElementById('dl-macos-arm').href    = find(/aarch64\.dmg$/);
+    document.getElementById('dl-macos-intel').href  = find(/x64\.dmg$/);
+    document.getElementById('dl-linux-appimage').href = find(/\.AppImage$/);
+    document.getElementById('dl-linux-deb').href    = find(/\.deb$/);
+  } catch(e) {
+    document.getElementById('dl-version').textContent = 'Download';
+  }
+})();
+</script>
 
 <footer>
   <span>LightCutSoundZ — MIT License</span>
