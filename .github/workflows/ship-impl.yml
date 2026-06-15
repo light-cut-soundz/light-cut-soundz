@@ -182,7 +182,6 @@ jobs:
     name: Publish Snap
     needs: [release]
     runs-on: ubuntu-22.04
-    if: ${{ secrets.SNAPCRAFT_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
