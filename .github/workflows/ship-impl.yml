@@ -95,13 +95,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Get latest tag
         id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(git describe --tags --abbrev=0)
+          TAG=$(gh api repos/light-cut-soundz/light-cut-soundz/git/refs/tags --jq '.[-1].ref | split("/") | .[-1]')
           echo "name=$TAG" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
 
