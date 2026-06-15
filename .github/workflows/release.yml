@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.1.0)'
+        required: true
+        default: 'v0.1.0'
 
 permissions:
   contents: write
@@ -57,10 +63,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: LightCutSoundZ ${{ github.ref_name }}
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: LightCutSoundZ ${{ github.event.inputs.tag || github.ref_name }}
           releaseBody: |
-            ## LightCutSoundZ ${{ github.ref_name }}
+            ## LightCutSoundZ ${{ github.event.inputs.tag || github.ref_name }}
 
             ### Téléchargements
 
@@ -95,7 +101,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           VERSION=${{ steps.ver.outputs.version }}
-          gh release download "${{ github.ref_name }}" \
+          gh release download "${{ github.event.inputs.tag || github.ref_name }}" \
             --repo light-cut-soundz/light-cut-soundz \
             --pattern "LightCutSoundZ_${VERSION}_aarch64.dmg" \
             --pattern "LightCutSoundZ_${VERSION}_x64.dmg"
