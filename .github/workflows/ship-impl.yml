@@ -26,12 +26,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Get latest tag
         id: tag
-        run: echo "name=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api repos/light-cut-soundz/light-cut-soundz/git/refs/tags --jq '.[-1].ref | split("/") | .[-1]')
+          echo "name=$TAG" >> $GITHUB_OUTPUT
 
       - uses: actions/setup-node@v4
         with:
