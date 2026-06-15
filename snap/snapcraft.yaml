@@ -16,6 +16,7 @@ apps:
   lightcutsoundz:
     command: usr/bin/lightcutsoundz
     extensions: [gnome]
+    desktop: usr/share/applications/lightcutsoundz.desktop
     plugs:
       - audio-playback
       - home
@@ -50,3 +51,8 @@ parts:
       cargo build --release -p lightcutsoundz
       install -Dm755 target/release/lightcutsoundz \
         "$CRAFT_PART_INSTALL/usr/bin/lightcutsoundz"
+      install -Dm644 src-tauri/icons/128x128.png \
+        "$CRAFT_PART_INSTALL/usr/share/icons/hicolor/128x128/apps/lightcutsoundz.png"
+      mkdir -p "$CRAFT_PART_INSTALL/usr/share/applications"
+      printf '[Desktop Entry]\nName=LightCutSoundZ\nComment=Lightweight audio editor\nExec=lightcutsoundz\nIcon=lightcutsoundz\nType=Application\nCategories=AudioVideo;Audio;\n' \
+        > "$CRAFT_PART_INSTALL/usr/share/applications/lightcutsoundz.desktop"
