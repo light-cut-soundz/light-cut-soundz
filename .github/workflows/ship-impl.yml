@@ -21,8 +21,6 @@ jobs:
             args: ''
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
-          - platform: macos-latest
-            args: '--target x86_64-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
 
@@ -45,7 +43,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -78,7 +76,6 @@ jobs:
             | Plateforme | Fichier |
             |---|---|
             | macOS Apple Silicon | `LightCutSoundZ_*_aarch64.dmg` |
-            | macOS Intel | `LightCutSoundZ_*_x64.dmg` |
             | Linux AppImage | `LightCutSoundZ_*_amd64.AppImage` |
             | Linux Debian/Ubuntu | `light-cut-soundz_*_amd64.deb` |
 
@@ -203,7 +200,5 @@ jobs:
 
       - name: Publish snap to store
         env:
-          SNAPCRAFT_TOKEN_B64: ${{ secrets.SNAPCRAFT_TOKEN }}
-        run: |
-          export SNAPCRAFT_STORE_CREDENTIALS=$(echo "$SNAPCRAFT_TOKEN_B64" | base64 -d)
-          /snap/bin/snapcraft upload "${{ steps.build.outputs.snap }}" --release stable
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
+        run: /snap/bin/snapcraft upload "${{ steps.build.outputs.snap }}" --release stable

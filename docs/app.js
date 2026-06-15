@@ -42,13 +42,11 @@ applyLang()
     const find = pat => (rel.assets.find(a => pat.test(a.name)) || {}).browser_download_url || '#'
 
     const arm   = find(/aarch64\.dmg$/)
-    const intel = find(/x64\.dmg$/)
     const appimage = find(/\.AppImage$/)
     const deb   = find(/\.deb$/)
 
     const set = (id, url) => { const el = document.getElementById(id); if (el) el.href = url }
     set('btn-mac-arm',     arm)
-    set('btn-mac-intel',   intel)
     set('btn-linux-appimage', appimage)
     set('btn-linux-deb',   deb)
     set('btn-appimage-alt', appimage)
