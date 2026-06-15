@@ -47,7 +47,6 @@ parts:
       rustup default stable
       npm ci
       npm run build
-      cd src-tauri
-      cargo build --release
+      cargo build --release -p lightcutsoundz
       install -Dm755 target/release/lightcutsoundz \
         "$CRAFT_PART_INSTALL/usr/bin/lightcutsoundz"
