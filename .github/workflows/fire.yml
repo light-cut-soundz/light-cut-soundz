@@ -1,0 +1,9 @@
+name: Fire Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call:
+    uses: ./.github/workflows/ship-impl.yml
+    secrets: inherit

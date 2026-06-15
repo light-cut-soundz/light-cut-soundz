@@ -1,13 +1,13 @@
-name: Ship
+name: Ship Implementation
 
 on:
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     strategy:
       fail-fast: false
       matrix:
@@ -86,7 +86,7 @@ jobs:
 
   update-homebrew:
     name: Update Homebrew tap
-    needs: [build]
+    needs: [release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
