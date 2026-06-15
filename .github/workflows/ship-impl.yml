@@ -201,9 +201,17 @@ jobs:
       - uses: snapcore/action-build@v1
         id: build
 
+      - name: Decode snap credentials
+        run: |
+          {
+            echo 'SNAPCRAFT_STORE_CREDENTIALS<<SNAP_CREDS_EOF'
+            echo "${{ secrets.SNAPCRAFT_TOKEN }}" | base64 -d
+            echo 'SNAP_CREDS_EOF'
+          } >> "$GITHUB_ENV"
+
       - uses: snapcore/action-publish@v1
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ env.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.build.outputs.snap }}
           release: stable
