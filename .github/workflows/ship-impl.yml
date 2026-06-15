@@ -121,42 +121,46 @@ jobs:
           git clone https://x-access-token:${GH_TOKEN}@github.com/light-cut-soundz/homebrew-tap.git
 
       - name: Write cask formula
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+          SHA_ARM: ${{ steps.sha.outputs.arm }}
+          SHA_INTEL: ${{ steps.sha.outputs.intel }}
         run: |
-          VERSION=${{ steps.tag.outputs.version }}
-          SHA_ARM=${{ steps.sha.outputs.arm }}
-          SHA_INTEL=${{ steps.sha.outputs.intel }}
+          python3 - <<'PYEOF'
+          import os
+          v = os.environ['VERSION']
+          arm = os.environ['SHA_ARM']
+          intel = os.environ['SHA_INTEL']
+          base = "https://github.com/light-cut-soundz/light-cut-soundz/releases/download"
+          content = f'''cask "lightcutsoundz" do
+            version "{v}"
 
-          cat <<'CASK_EOF' > homebrew-tap/Casks/lightcutsoundz.rb
-cask "lightcutsoundz" do
-  version "VERSION_PLACEHOLDER"
+            on_arm do
+              url "{base}/v#{{version}}/LightCutSoundZ_#{{version}}_aarch64.dmg"
+              sha256 "{arm}"
+            end
 
-  on_arm do
-    url "https://github.com/light-cut-soundz/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_aarch64.dmg"
-    sha256 "SHA_ARM_PLACEHOLDER"
-  end
+            on_intel do
+              url "{base}/v#{{version}}/LightCutSoundZ_#{{version}}_x64.dmg"
+              sha256 "{intel}"
+            end
 
-  on_intel do
-    url "https://github.com/light-cut-soundz/light-cut-soundz/releases/download/v#{version}/LightCutSoundZ_#{version}_x64.dmg"
-    sha256 "SHA_INTEL_PLACEHOLDER"
-  end
+            name "LightCutSoundZ"
+            desc "Fast, minimal desktop audio editor"
+            homepage "https://light-cut-soundz.github.io/light-cut-soundz/"
 
-  name "LightCutSoundZ"
-  desc "Fast, minimal desktop audio editor"
-  homepage "https://light-cut-soundz.github.io/light-cut-soundz/"
+            app "LightCutSoundZ.app"
 
-  app "LightCutSoundZ.app"
-
-  zap trash: [
-    "~/Library/Application Support/dev.lightcutsoundz",
-    "~/Library/Preferences/dev.lightcutsoundz.plist",
-    "~/Library/Saved Application State/dev.lightcutsoundz.savedState",
-  ]
-end
-CASK_EOF
-
-          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/" homebrew-tap/Casks/lightcutsoundz.rb
-          sed -i "s/SHA_ARM_PLACEHOLDER/${SHA_ARM}/" homebrew-tap/Casks/lightcutsoundz.rb
-          sed -i "s/SHA_INTEL_PLACEHOLDER/${SHA_INTEL}/" homebrew-tap/Casks/lightcutsoundz.rb
+            zap trash: [
+              "~/Library/Application Support/dev.lightcutsoundz",
+              "~/Library/Preferences/dev.lightcutsoundz.plist",
+              "~/Library/Saved Application State/dev.lightcutsoundz.savedState",
+            ]
+          end
+          '''
+          with open('homebrew-tap/Casks/lightcutsoundz.rb', 'w') as f:
+              f.write(content)
+          PYEOF
 
       - name: Commit and push
         run: |
