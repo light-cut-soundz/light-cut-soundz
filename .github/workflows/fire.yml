@@ -14,3 +14,4 @@ jobs:
     uses: ./.github/workflows/ship-impl.yml
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      SNAPCRAFT_TOKEN: ${{ secrets.SNAPCRAFT_TOKEN }}

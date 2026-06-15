@@ -5,6 +5,8 @@ on:
     secrets:
       GH_TOKEN:
         required: false
+      SNAPCRAFT_TOKEN:
+        required: false
 
 permissions:
   contents: write
@@ -175,3 +177,34 @@ jobs:
           git add Casks/lightcutsoundz.rb
           git commit -m "Update lightcutsoundz to ${{ steps.tag.outputs.version }}"
           git push
+
+  publish-snap:
+    name: Publish Snap
+    needs: [release]
+    runs-on: ubuntu-22.04
+    if: ${{ secrets.SNAPCRAFT_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(gh api repos/light-cut-soundz/light-cut-soundz/git/refs/tags --jq '.[-1].ref | split("/") | .[-1]')
+          echo "name=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
+      - name: Update version in snapcraft.yaml
+        run: |
+          sed -i "s/^version: .*/version: '${{ steps.tag.outputs.version }}'/" snap/snapcraft.yaml
+
+      - uses: snapcore/action-build@v1
+        id: build
+
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
