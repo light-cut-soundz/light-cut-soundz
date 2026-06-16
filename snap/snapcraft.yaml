@@ -39,9 +39,9 @@ parts:
       - librsvg2-dev
     stage-packages:
       - libwebkit2gtk-4.1-0
-      - libgtk-3-0t64
+      - libgtk-3-0
       - libayatana-appindicator3-1
-      - librsvg2-2t64
+      - librsvg2-2
       - gstreamer1.0-plugins-base
       - gstreamer1.0-plugins-good
       - libgstreamer1.0-0
