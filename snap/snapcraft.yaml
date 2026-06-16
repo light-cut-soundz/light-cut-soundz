@@ -2,6 +2,7 @@ name: lightcutsoundz
 base: core22
 version: '0.1.0'
 summary: Éditeur audio desktop léger et gratuit
+icon: src-tauri/icons/icon.png
 description: |
   LightCutSoundZ est un éditeur audio desktop léger et gratuit pour Linux.
   Décodage pur Rust, aperçu en temps réel.
