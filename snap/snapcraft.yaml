@@ -18,6 +18,8 @@ apps:
     command: usr/bin/lightcutsoundz
     extensions: [gnome]
     desktop: usr/share/applications/lightcutsoundz.desktop
+    environment:
+      WEBKIT_DISABLE_DMABUF_RENDERER: "1"
     plugs:
       - audio-playback
       - home
