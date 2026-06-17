@@ -241,6 +241,8 @@ input[type="number"] {
 input[type="number"]:focus { border-color: var(--accent); }
 
 select {
+  appearance: none;
+  -webkit-appearance: none;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;

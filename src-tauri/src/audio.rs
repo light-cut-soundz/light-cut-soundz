@@ -136,13 +136,19 @@ pub fn encode_via_ffmpeg(buf: &AudioBuffer, output_path: &str, format: &str) -> 
 
     encode_wav(buf, &tmp_path)?;
 
-    let status = std::process::Command::new("ffmpeg")
+    let ffmpeg_bin = std::env::var("SNAP")
+        .map(|snap| format!("{snap}/usr/bin/ffmpeg"))
+        .unwrap_or_else(|_| "ffmpeg".to_string());
+
+    let output = std::process::Command::new(&ffmpeg_bin)
         .args(["-y", "-i", &tmp_path, output_path])
-        .status()
+        .output()
         .context("ffmpeg not found — install ffmpeg to export MP3/FLAC/OGG")?;
 
-    if !status.success() {
-        bail!("ffmpeg failed to encode to {format}");
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let last_line = stderr.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("(no output)");
+        bail!("ffmpeg failed to encode to {format}: {last_line}");
     }
     Ok(())
 }

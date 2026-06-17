@@ -20,6 +20,7 @@ apps:
     desktop: usr/share/applications/lightcutsoundz.desktop
     environment:
       WEBKIT_DISABLE_DMABUF_RENDERER: "1"
+      WEBKIT_EXEC_PATH: "$SNAP/usr/lib/x86_64-linux-gnu/webkit2gtk-4.1"
     plugs:
       - audio-playback
       - home
@@ -45,11 +46,13 @@ parts:
       - gstreamer1.0-plugins-base
       - gstreamer1.0-plugins-good
       - libgstreamer1.0-0
+      - ffmpeg
+      - libblas3
     override-build: |
       rustup default stable
       npm ci
       npm run build
-      cargo build --release -p lightcutsoundz
+      cargo build --release --features custom-protocol -p lightcutsoundz
       install -Dm755 target/release/lightcutsoundz \
         "$CRAFT_PART_INSTALL/usr/bin/lightcutsoundz"
       install -Dm644 src-tauri/icons/128x128.png \
@@ -57,3 +60,7 @@ parts:
       mkdir -p "$CRAFT_PART_INSTALL/usr/share/applications"
       printf '[Desktop Entry]\nName=LightCutSoundZ\nComment=Lightweight audio editor\nExec=lightcutsoundz\nIcon=lightcutsoundz\nType=Application\nCategories=AudioVideo;Audio;\n' \
         > "$CRAFT_PART_INSTALL/usr/share/applications/lightcutsoundz.desktop"
+      ln -sf blas/libblas.so.3.12.0 \
+        "$CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/libblas.so.3"
+      ln -sf lapack/liblapack.so.3.12.0 \
+        "$CRAFT_PART_INSTALL/usr/lib/x86_64-linux-gnu/liblapack.so.3"
