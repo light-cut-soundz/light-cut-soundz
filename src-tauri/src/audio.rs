@@ -147,7 +147,11 @@ pub fn encode_via_ffmpeg(buf: &AudioBuffer, output_path: &str, format: &str) -> 
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        let last_line = stderr.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("(no output)");
+        let last_line = stderr
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("(no output)");
         bail!("ffmpeg failed to encode to {format}: {last_line}");
     }
     Ok(())
