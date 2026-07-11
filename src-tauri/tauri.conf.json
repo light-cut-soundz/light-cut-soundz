@@ -1,6 +1,6 @@
 {
   "productName": "LightCutSoundZ",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "dev.lightcutsoundz",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -24,6 +24,14 @@
         "enable": true,
         "scope": ["$HOME/**", "/Volumes/**"]
       }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFCOUQzREM4OUJBNjFCRTgKUldUb0c2YWJ5RDJkRzVUcFZNVlk4QlVuQW5IeEppbk1yZzc4UUpJQk9SbHF4dFl4Q2FONmhjRFAK",
+      "endpoints": [
+        "https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {

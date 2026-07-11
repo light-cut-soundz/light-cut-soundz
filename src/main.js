@@ -1,7 +1,8 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
-import { getVersion } from '@tauri-apps/api/app'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { check } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -531,33 +532,26 @@ function hideToast() { toast.classList.add('hidden') }
 
 window.addEventListener('resize', renderWaveform)
 
-// ─── Update check ─────────────────────────────────────────────────────────────
+// ─── Auto-updater ─────────────────────────────────────────────────────────────
 
-async function checkForUpdate() {
+async function autoUpdate() {
   try {
-    const current = await getVersion()
-    const res = await fetch('https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest', {
-      headers: { Accept: 'application/vnd.github+json' }
-    })
-    if (!res.ok) return
-    const { tag_name } = await res.json()
-    const latest = tag_name.replace(/^v/, '')
-    if (latest !== current) {
-      showUpdateBanner(latest)
-    }
-  } catch { /* silencieux si pas de réseau */ }
+    const update = await check()
+    if (!update) return
+    showUpdateBanner(`v${update.version} disponible, téléchargement…`)
+    await update.downloadAndInstall()
+    await relaunch()
+  } catch { /* silencieux si pas de réseau ou en dev */ }
 }
 
-function showUpdateBanner(version) {
-  const banner = document.createElement('div')
-  banner.id = 'update-banner'
-  banner.innerHTML = `
-    <span>Mise à jour disponible : v${version}</span>
-    <code>brew upgrade lightcutsoundz</code>
-    <button id="update-dismiss">✕</button>
-  `
-  document.getElementById('app').prepend(banner)
-  document.getElementById('update-dismiss').addEventListener('click', () => banner.remove())
+function showUpdateBanner(msg) {
+  let banner = document.getElementById('update-banner')
+  if (!banner) {
+    banner = document.createElement('div')
+    banner.id = 'update-banner'
+    document.getElementById('app').prepend(banner)
+  }
+  banner.textContent = msg
 }
 
-checkForUpdate()
+autoUpdate()
