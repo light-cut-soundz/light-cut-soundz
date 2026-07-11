@@ -412,6 +412,14 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 }
 .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
 
+#open-btn-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
 /* Toast */
 .toast {
   position: fixed;

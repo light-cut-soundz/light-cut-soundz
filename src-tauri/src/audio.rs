@@ -127,6 +127,35 @@ pub fn encode_wav(buf: &AudioBuffer, path: &str) -> Result<()> {
     Ok(())
 }
 
+fn find_ffmpeg() -> String {
+    if let Ok(exe) = std::env::current_exe() {
+        // macOS app bundle: Contents/MacOS/exe → Contents/MacOS/ffmpeg
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("ffmpeg");
+            if candidate.exists() {
+                return candidate.to_string_lossy().to_string();
+            }
+        }
+        // macOS app bundle: Contents/MacOS/exe → Contents/Resources/ffmpeg
+        if let Some(resources) = exe
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("Resources").join("ffmpeg"))
+        {
+            if resources.exists() {
+                return resources.to_string_lossy().to_string();
+            }
+        }
+    }
+    if let Ok(snap) = std::env::var("SNAP") {
+        let p = format!("{snap}/usr/bin/ffmpeg");
+        if std::path::Path::new(&p).exists() {
+            return p;
+        }
+    }
+    "ffmpeg".to_string()
+}
+
 pub fn encode_via_ffmpeg(buf: &AudioBuffer, output_path: &str, format: &str) -> Result<()> {
     let tmp = tempfile::Builder::new()
         .suffix(".wav")
@@ -136,9 +165,7 @@ pub fn encode_via_ffmpeg(buf: &AudioBuffer, output_path: &str, format: &str) -> 
 
     encode_wav(buf, &tmp_path)?;
 
-    let ffmpeg_bin = std::env::var("SNAP")
-        .map(|snap| format!("{snap}/usr/bin/ffmpeg"))
-        .unwrap_or_else(|_| "ffmpeg".to_string());
+    let ffmpeg_bin = find_ffmpeg();
 
     let output = std::process::Command::new(&ffmpeg_bin)
         .args(["-y", "-i", &tmp_path, output_path])

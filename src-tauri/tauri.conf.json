@@ -1,6 +1,6 @@
 {
   "productName": "LightCutSoundZ",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "dev.lightcutsoundz",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -22,7 +22,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": ["$HOME/**", "/Volumes/**"]
       }
     }
   },
@@ -35,6 +35,7 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "externalBin": ["binaries/ffmpeg"]
   }
 }

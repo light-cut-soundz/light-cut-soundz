@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { invoke, convertFileSrc } from '@tauri-apps/api/core'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
@@ -15,13 +15,14 @@ const state = {
 // ─── DOM ─────────────────────────────────────────────────────────────────────
 
 const $ = (id) => document.getElementById(id)
-const dropZone  = $('drop-zone')
-const editor    = $('editor')
-const canvas    = $('waveform')
-const openBtn   = $('open-btn')
-const exportBtn = $('export-btn')
-const playBtn   = $('play-btn')
-const toast     = $('toast')
+const dropZone     = $('drop-zone')
+const editor       = $('editor')
+const canvas       = $('waveform')
+const openBtn      = $('open-btn')
+const openBtnHeader = $('open-btn-header')
+const exportBtn    = $('export-btn')
+const playBtn      = $('play-btn')
+const toast        = $('toast')
 
 // ─── Audio playback (Web Audio API) ─────────────────────────────────────────
 
@@ -42,11 +43,8 @@ async function setupAudio(path) {
   audioPeak   = 1.0
   playStartOffset = 0
 
-  const data = await invoke('get_audio_pcm', { path })
-
   if (!audioCtx) {
     audioCtx = new AudioContext()
-    // Build persistent processing chain: source → fade → filter → normalize → out
     fadeGainNode      = audioCtx.createGain()
     filterNode        = audioCtx.createBiquadFilter()
     normalizeGainNode = audioCtx.createGain()
@@ -56,13 +54,13 @@ async function setupAudio(path) {
   }
   if (audioCtx.state === 'suspended') await audioCtx.resume()
 
-  const ab = audioCtx.createBuffer(data.channels, data.samples[0].length, data.sample_rate)
-  for (let ch = 0; ch < data.channels; ch++) {
-    ab.copyToChannel(new Float32Array(data.samples[ch]), ch)
-  }
+  const url = convertFileSrc(path)
+  const resp = await fetch(url)
+  if (!resp.ok) throw new Error(`Impossible d'accéder au fichier (${resp.status})`)
+  const arrayBuffer = await resp.arrayBuffer()
+  const ab = await audioCtx.decodeAudioData(arrayBuffer)
   audioBuffer = ab
 
-  // Compute peak once for normalize preview
   audioPeak = 0
   for (let ch = 0; ch < ab.numberOfChannels; ch++) {
     const d = ab.getChannelData(ch)
@@ -429,6 +427,7 @@ async function loadFile(path) {
 
     dropZone.classList.add('hidden')
     editor.classList.remove('hidden')
+    openBtnHeader.classList.remove('hidden')
     renderWaveform()
     hideToast()
   } catch (e) {
@@ -436,13 +435,16 @@ async function loadFile(path) {
   }
 }
 
-openBtn.addEventListener('click', async () => {
+async function pickAndLoad() {
   const path = await open({
     multiple: false,
     filters: [{ name: 'Audio', extensions: ['mp3','wav','flac','ogg','aac','m4a','opus'] }],
   })
   if (path) await loadFile(path)
-})
+}
+
+openBtn.addEventListener('click', pickAndLoad)
+openBtnHeader.addEventListener('click', pickAndLoad)
 
 getCurrentWindow().onDragDropEvent(async (event) => {
   if (event.payload.type === 'enter')       dropZone.classList.add('drag-over')
@@ -522,7 +524,7 @@ function showToast(msg, type = '') {
   toast.textContent = msg
   toast.className = 'toast' + (type ? ' ' + type : '')
   clearTimeout(toastTimer)
-  if (type) toastTimer = setTimeout(hideToast, 3500)
+  if (type && type !== 'error') toastTimer = setTimeout(hideToast, 3500)
 }
 function hideToast() { toast.classList.add('hidden') }
 

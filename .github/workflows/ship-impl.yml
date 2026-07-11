@@ -61,6 +61,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Download ffmpeg sidecar
+        run: |
+          mkdir -p src-tauri/binaries
+          BASE="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            curl -L "$BASE/ffmpeg-darwin-arm64" -o src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+            chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          else
+            curl -L "$BASE/ffmpeg-linux-x64" -o src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+            chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          fi
+
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:
