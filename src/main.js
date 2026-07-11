@@ -1,4 +1,5 @@
 import { invoke, convertFileSrc } from '@tauri-apps/api/core'
+import { getVersion } from '@tauri-apps/api/app'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
@@ -529,3 +530,34 @@ function showToast(msg, type = '') {
 function hideToast() { toast.classList.add('hidden') }
 
 window.addEventListener('resize', renderWaveform)
+
+// ─── Update check ─────────────────────────────────────────────────────────────
+
+async function checkForUpdate() {
+  try {
+    const current = await getVersion()
+    const res = await fetch('https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest', {
+      headers: { Accept: 'application/vnd.github+json' }
+    })
+    if (!res.ok) return
+    const { tag_name } = await res.json()
+    const latest = tag_name.replace(/^v/, '')
+    if (latest !== current) {
+      showUpdateBanner(latest)
+    }
+  } catch { /* silencieux si pas de réseau */ }
+}
+
+function showUpdateBanner(version) {
+  const banner = document.createElement('div')
+  banner.id = 'update-banner'
+  banner.innerHTML = `
+    <span>Mise à jour disponible : v${version}</span>
+    <code>brew upgrade lightcutsoundz</code>
+    <button id="update-dismiss">✕</button>
+  `
+  document.getElementById('app').prepend(banner)
+  document.getElementById('update-dismiss').addEventListener('click', () => banner.remove())
+}
+
+checkForUpdate()

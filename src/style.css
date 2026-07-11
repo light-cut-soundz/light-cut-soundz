@@ -33,6 +33,36 @@ body {
   overflow: hidden;
 }
 
+/* Update banner */
+#update-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  background: rgba(124, 58, 237, 0.15);
+  border-bottom: 1px solid var(--accent-dim);
+  font-size: 13px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+#update-banner code {
+  background: rgba(124, 58, 237, 0.2);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--accent-light);
+}
+#update-banner span { flex: 1; }
+#update-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+#update-dismiss:hover { color: var(--text); }
+
 /* Header */
 header {
   display: flex;
