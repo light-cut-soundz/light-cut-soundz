@@ -1,0 +1,27 @@
+name: Fire Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release, e.g. v0.1.9
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  call:
+    uses: ./.github/workflows/ship-impl.yml
+    # github.ref_name is the tag that triggered the run. The previous lookup
+    # took the last entry of the tags API, which is ordered lexicographically:
+    # it would have picked v0.1.9 once v0.1.10 existed.
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

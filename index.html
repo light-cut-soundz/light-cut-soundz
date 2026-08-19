@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LightCutSoundz</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo">LightCut<span>Soundz</span></div>
+      <div id="file-badge" class="file-badge hidden">
+        <span id="badge-name"></span>
+        <span id="badge-meta"></span>
+      </div>
+      <button id="open-btn-header" class="btn-ghost hidden" data-i18n-title="header.openOther">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span data-i18n="header.open">Ouvrir</span>
+      </button>
+    </header>
+
+    <!-- Drop zone -->
+    <section id="drop-zone" class="drop-zone">
+      <div class="drop-inner">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/>
+        </svg>
+        <p data-i18n="drop.title">Dépose un fichier audio ici</p>
+        <span data-i18n="drop.or">ou</span>
+        <button id="open-btn" class="btn-ghost" data-i18n="drop.open">Ouvrir un fichier</button>
+      </div>
+    </section>
+
+    <!-- Editor (hidden until file loaded) -->
+    <section id="editor" class="editor hidden">
+
+      <!-- Waveform -->
+      <div class="waveform-container">
+        <div class="player-bar">
+          <button id="play-btn" class="play-btn" data-i18n-title="player.playPause">
+            <svg id="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+          <span id="time-current" class="mono">0:00</span>
+          <span class="time-sep">/</span>
+          <span id="time-total" class="mono">0:00</span>
+          <span class="player-hint" data-i18n="player.hint">Glisse les poignées pour trimmer</span>
+        </div>
+        <canvas id="waveform"></canvas>
+      </div>
+
+      <!-- Controls grid -->
+      <div class="controls-grid">
+
+        <!-- Trim -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 20L12 4l6 16M4 15h16"/>
+            </svg>
+            <span data-i18n="trim.title">Trim</span>
+            <label class="toggle"><input type="checkbox" id="trim-enabled"><span class="slider"></span></label>
+          </div>
+          <div class="card-body" id="trim-body">
+            <div class="field-row">
+              <label data-i18n="trim.start">Début</label>
+              <div class="input-unit"><input type="number" id="trim-start" value="0" min="0" step="0.1"><span>s</span></div>
+            </div>
+            <div class="field-row">
+              <label data-i18n="trim.end">Fin</label>
+              <div class="input-unit"><input type="number" id="trim-end" value="0" min="0" step="0.1"><span>s</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fade -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 20h20M2 4l10 12L22 4"/>
+            </svg>
+            <span data-i18n="fade.title">Fade</span>
+          </div>
+          <div class="card-body">
+            <div class="field-row">
+              <label data-i18n="fade.in">Fade in</label>
+              <input type="range" id="fadein" min="0" max="10" step="0.1" value="0">
+              <span class="range-val" id="fadein-val">0s</span>
+            </div>
+            <div class="field-row">
+              <label data-i18n="fade.out">Fade out</label>
+              <input type="range" id="fadeout" min="0" max="10" step="0.1" value="0">
+              <span class="range-val" id="fadeout-val">0s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Volume -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+            </svg>
+            <span data-i18n="volume.title">Volume</span>
+          </div>
+          <div class="card-body">
+            <label class="checkbox-row">
+              <input type="checkbox" id="normalize">
+              <span data-i18n="volume.normalize">Normaliser (pic −1 dBFS)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Speed -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span data-i18n="speed.title">Vitesse</span>
+          </div>
+          <div class="card-body">
+            <div class="field-row">
+              <input type="range" id="speed" min="0.25" max="3.0" step="0.05" value="1.0">
+              <span class="range-val" id="speed-val">1.00×</span>
+            </div>
+            <div class="speed-presets">
+              <button class="preset" data-v="0.5">½×</button>
+              <button class="preset active" data-v="1.0">1×</button>
+              <button class="preset" data-v="1.5">1.5×</button>
+              <button class="preset" data-v="2.0">2×</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="card">
+          <div class="card-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+            </svg>
+            <span data-i18n="filter.title">Filtre</span>
+          </div>
+          <div class="card-body">
+            <select id="filter-type">
+              <option value="" data-i18n="filter.none">Aucun</option>
+              <option value="lowpass">Low-pass</option>
+              <option value="highpass">High-pass</option>
+              <option value="bandpass">Band-pass</option>
+            </select>
+            <div id="filter-params" class="hidden">
+              <div class="field-row">
+                <label id="filter-freq-label" data-i18n="filter.frequency">Fréquence</label>
+                <div class="input-unit">
+                  <input type="number" id="filter-freq" value="1000" min="1" step="100">
+                  <span>Hz</span>
+                </div>
+              </div>
+              <div class="field-row" id="filter-bw-row" style="display:none">
+                <label data-i18n="filter.bandwidth">Largeur</label>
+                <div class="input-unit">
+                  <input type="number" id="filter-bw" value="500" min="1" step="50">
+                  <span>Hz</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /controls-grid -->
+
+      <!-- Export bar -->
+      <div class="export-bar">
+        <div class="format-tabs">
+          <button class="fmt active" data-fmt="wav">WAV</button>
+          <button class="fmt" data-fmt="mp3">MP3</button>
+          <button class="fmt" data-fmt="flac">FLAC</button>
+          <button class="fmt" data-fmt="ogg">OGG</button>
+        </div>
+        <button id="export-btn" class="btn-export">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span data-i18n="export.run">Exporter</span>
+        </button>
+      </div>
+
+    </section><!-- /editor -->
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+  </div><!-- /app -->
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

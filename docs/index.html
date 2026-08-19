@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <title>LightCutSoundz — Éditeur audio léger</title>
+  <meta name="description" content="LightCutSoundz est un éditeur audio desktop léger et gratuit pour macOS et Linux. Décodage pur Rust, aperçu en temps réel." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Nav ── -->
+  <header class="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <img src="favicon.png" alt="" class="nav-logo-icon" />
+        LightCutSoundz
+      </a>
+      <nav class="nav-links">
+        <a href="#features" data-fr="Fonctionnalités" data-en="Features">Fonctionnalités</a>
+        <a href="#download" data-fr="Télécharger" data-en="Download">Télécharger</a>
+        <a href="https://github.com/light-cut-soundz/light-cut-soundz" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+      <button class="lang-toggle" id="langToggle" aria-label="Switch language">EN</button>
+    </div>
+  </header>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <img src="favicon.png" alt="LightCutSoundz" class="hero-logo" />
+      <h1 class="hero-title">
+        <span data-fr="L'essentiel de l'édition audio." data-en="Audio editing, stripped to the essentials.">L'essentiel de l'édition audio.</span>
+      </h1>
+      <p class="hero-sub">
+        <span data-fr="Gratuit, open-source, sans dépendances. Décodage pur Rust, aperçu en temps réel." data-en="Free, open-source, no dependencies. Pure Rust decoding, real-time preview.">Gratuit, open-source, sans dépendances. Décodage pur Rust, aperçu en temps réel.</span>
+      </p>
+      <div class="hero-actions">
+        <a href="#download" class="btn-primary">
+          <span data-fr="Télécharger" data-en="Download">Télécharger</span>
+        </a>
+        <a href="https://github.com/light-cut-soundz/light-cut-soundz" target="_blank" rel="noopener" class="btn-ghost">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+      <div class="hero-platforms">
+        <span class="platform-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          macOS
+        </span>
+        <span class="platform-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg>
+          Linux
+        </span>
+        <span class="platform-badge platform-free">
+          <span data-fr="100% Gratuit" data-en="100% Free">100% Gratuit</span>
+        </span>
+      </div>
+    </div>
+    <div class="hero-glow"></div>
+  </section>
+
+  <!-- ── Features ── -->
+  <section class="features" id="features">
+    <div class="section-inner">
+      <h2 class="section-title" data-fr="Tout ce dont vous avez besoin." data-en="Everything you need.">Tout ce dont vous avez besoin.</h2>
+      <p class="section-sub" data-fr="Sans superflu. Sans abonnement. Sans Cloud." data-en="No bloat. No subscription. No cloud.">Sans superflu. Sans abonnement. Sans Cloud.</p>
+      <div class="features-grid">
+
+        <div class="feature-card">
+          <div class="feature-icon">✂️</div>
+          <h3 data-fr="Trim précis" data-en="Precise trim">Trim précis</h3>
+          <p data-fr="Découpez votre audio par timestamp en secondes. Opération non-destructive sur le buffer en mémoire." data-en="Cut your audio by timestamp in seconds. Non-destructive operation on the in-memory buffer.">Découpez votre audio par timestamp en secondes. Opération non-destructive sur le buffer en mémoire.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔉</div>
+          <h3 data-fr="Fade in / Fade out" data-en="Fade in / Fade out">Fade in / Fade out</h3>
+          <p data-fr="Rampe linéaire sur les N premières ou dernières secondes. Durée configurable au dixième de seconde." data-en="Linear ramp over the first or last N seconds. Duration configurable to the tenth of a second.">Rampe linéaire sur les N premières ou dernières secondes. Durée configurable au dixième de seconde.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🔊</div>
+          <h3 data-fr="Normalisation" data-en="Normalize">Normalisation</h3>
+          <p data-fr="Normalisation au pic max : tous les samples sont divisés par la valeur absolue maximale pour atteindre 0 dBFS." data-en="Peak normalization: all samples are divided by the absolute maximum to reach 0 dBFS.">Normalisation au pic max : tous les samples sont divisés par la valeur absolue maximale pour atteindre 0 dBFS.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">⏩</div>
+          <h3 data-fr="Changement de vitesse" data-en="Speed change">Changement de vitesse</h3>
+          <p data-fr="Accélération ou ralentissement par rééchantillonnage (rubato). 0.5× = moitié de durée, pitch monte aussi." data-en="Speed up or slow down via resampling (rubato). 0.5× = half duration, pitch shifts too.">Accélération ou ralentissement par rééchantillonnage (rubato). 0.5× = moitié de durée, pitch monte aussi.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🎛️</div>
+          <h3 data-fr="Filtres DSP" data-en="DSP Filters">Filtres DSP</h3>
+          <p data-fr="Filtres biquad IIR : passe-bas, passe-haut, passe-bande. Basé sur le RBJ Audio Cookbook, Q = 0.707." data-en="Biquad IIR filters: low-pass, high-pass, band-pass. Based on the RBJ Audio Cookbook, Q = 0.707.">Filtres biquad IIR : passe-bas, passe-haut, passe-bande. Basé sur le RBJ Audio Cookbook, Q = 0.707.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">👂</div>
+          <h3 data-fr="Aperçu en temps réel" data-en="Real-time preview">Aperçu en temps réel</h3>
+          <p data-fr="Écoutez l'effet des filtres, fades, vitesse et normalisation pendant la lecture via Web Audio API." data-en="Hear the effect of filters, fades, speed and normalization during playback via the Web Audio API.">Écoutez l'effet des filtres, fades, vitesse et normalisation pendant la lecture via Web Audio API.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">💾</div>
+          <h3 data-fr="Export multi-formats" data-en="Multi-format export">Export multi-formats</h3>
+          <p data-fr="Exportez en WAV (natif), MP3, FLAC ou OGG. WAV est disponible partout, les autres via FFmpeg si installé." data-en="Export to WAV (native), MP3, FLAC or OGG. WAV works everywhere, others via FFmpeg if installed.">Exportez en WAV (natif), MP3, FLAC ou OGG. WAV est disponible partout, les autres via FFmpeg si installé.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon">🦀</div>
+          <h3 data-fr="Décodage pur Rust" data-en="Pure Rust decoding">Décodage pur Rust</h3>
+          <p data-fr="Lecture audio via symphonia — aucun GStreamer ni codec système requis. Fonctionne sur toutes les distros Linux." data-en="Audio decoding via symphonia — no GStreamer or system codec required. Works on all Linux distros.">Lecture audio via symphonia — aucun GStreamer ni codec système requis. Fonctionne sur toutes les distros Linux.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Formats ── -->
+  <section class="formats">
+    <div class="section-inner">
+      <h2 class="section-title" data-fr="Formats supportés" data-en="Supported formats">Formats supportés</h2>
+      <div class="formats-row">
+        <div class="formats-group">
+          <span class="formats-label" data-fr="Import" data-en="Import">Import</span>
+          <div class="format-tags">
+            <span class="tag">MP3</span>
+            <span class="tag">FLAC</span>
+            <span class="tag">WAV</span>
+            <span class="tag">OGG</span>
+            <span class="tag">AAC</span>
+            <span class="tag">M4A</span>
+          </div>
+        </div>
+        <div class="formats-divider"></div>
+        <div class="formats-group">
+          <span class="formats-label" data-fr="Export" data-en="Export">Export</span>
+          <div class="format-tags">
+            <span class="tag tag-accent">WAV</span>
+            <span class="tag tag-accent">MP3</span>
+            <span class="tag tag-accent">FLAC</span>
+            <span class="tag tag-accent">OGG</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Download ── -->
+  <section class="download" id="download">
+    <div class="section-inner">
+      <h2 class="section-title" data-fr="Télécharger LightCutSoundz" data-en="Download LightCutSoundz">Télécharger LightCutSoundz</h2>
+      <p class="section-sub">
+        <span data-fr="Gratuit et open-source. Toujours." data-en="Free and open-source. Always.">Gratuit et open-source. Toujours.</span>
+        <span style="margin-left:8px;font-size:.85rem;color:var(--muted)" class="dl-release-version"></span>
+      </p>
+
+      <div class="install-hero">
+        <div class="install-hero-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-fr="Recommandé" data-en="Recommended">Recommandé</span>
+        </div>
+        <h3 class="install-hero-title" data-fr="macOS &amp; Linux — Une seule commande" data-en="macOS &amp; Linux — One command">macOS &amp; Linux — Une seule commande</h3>
+        <p class="install-hero-sub" data-fr="Homebrew sur Mac · .deb ou AppImage sur Linux — détection automatique" data-en="Homebrew on Mac · .deb or AppImage on Linux — automatic detection">Homebrew sur Mac · .deb ou AppImage sur Linux — détection automatique</p>
+        <div class="installer-cmd install-hero-cmd">
+          <code class="copy-target">curl -fsSL https://raw.githubusercontent.com/light-cut-soundz/light-cut-soundz/main/install.sh | bash</code>
+          <button class="copy-btn" aria-label="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+        <div class="install-hero-pills">
+          <span class="install-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg> macOS → Homebrew</span>
+          <span class="install-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg> Ubuntu / Debian → .deb</span>
+          <span class="install-pill"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg> <span data-fr="Autres Linux → AppImage" data-en="Other Linux → AppImage">Autres Linux → AppImage</span></span>
+        </div>
+      </div>
+
+      <p class="alt-divider" data-fr="ou installer manuellement" data-en="or install manually">ou installer manuellement</p>
+      <div class="download-cards">
+
+        <!-- macOS -->
+        <div class="download-card">
+          <div class="dl-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          </div>
+          <h3>macOS</h3>
+          <p class="dl-version">Homebrew · Apple Silicon</p>
+
+          <div class="dl-pkg">
+            <p class="dl-alt-label">Homebrew</p>
+            <div class="installer-cmd">
+              <code class="copy-target">brew install --cask light-cut-soundz/tap/light-cut-soundz</code>
+              <button class="copy-btn" aria-label="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linux -->
+        <div class="download-card">
+          <div class="dl-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg>
+          </div>
+          <h3>Linux</h3>
+          <p class="dl-version">AppImage · deb</p>
+          <p class="dl-note" data-fr="Ubuntu, Debian, Fedora, Arch…" data-en="Ubuntu, Debian, Fedora, Arch…">Ubuntu, Debian, Fedora, Arch…</p>
+          <div class="dl-pkg">
+            <p class="dl-alt-label">Debian / Ubuntu</p>
+            <div class="installer-cmd">
+              <code class="copy-target">curl -fsSL -o LightCutSoundz.deb "$(curl -fsSL https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest | grep -o 'https://[^"]*_amd64\.deb' | head -1)" &amp;&amp; sudo apt install ./LightCutSoundz.deb</code>
+              <button class="copy-btn" aria-label="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            </div>
+          </div>
+          <div class="dl-pkg">
+            <p class="dl-alt-label" data-fr="Autres distributions" data-en="Other distributions">Autres distributions</p>
+            <div class="installer-cmd">
+              <code class="copy-target">mkdir -p ~/.local/bin &amp;&amp; curl -fsSL -o ~/.local/bin/lightcutsoundz.AppImage "$(curl -fsSL https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest | grep -o 'https://[^"]*_amd64\.AppImage' | head -1)" &amp;&amp; chmod +x ~/.local/bin/lightcutsoundz.AppImage</code>
+              <button class="copy-btn" aria-label="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+
+    </div>
+  </section>
+
+  <!-- ── Uninstall ── -->
+  <section class="uninstall" id="uninstall">
+    <div class="section-inner">
+      <h2 class="section-title" data-fr="Désinstaller" data-en="Uninstall">Désinstaller</h2>
+
+      <div class="install-hero">
+        <div class="install-hero-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span data-fr="Recommandé" data-en="Recommended">Recommandé</span>
+        </div>
+        <h3 class="install-hero-title" data-fr="macOS &amp; Linux — Une seule commande" data-en="macOS &amp; Linux — One command">macOS &amp; Linux — Une seule commande</h3>
+        <p class="install-hero-sub" data-fr="Retire l’application quelle que soit la façon dont elle a été installée. Vos réglages sont conservés." data-en="Removes the app whichever way it was installed. Your settings are kept.">Retire l’application quelle que soit la façon dont elle a été installée. Vos réglages sont conservés.</p>
+        <div class="installer-cmd install-hero-cmd">
+          <code class="copy-target">curl -fsSL https://raw.githubusercontent.com/light-cut-soundz/light-cut-soundz/main/uninstall.sh | bash</code>
+          <button class="copy-btn" aria-label="Copy"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+
+      <p class="alt-divider" data-fr="ou désinstaller manuellement" data-en="or uninstall manually">ou désinstaller manuellement</p>
+
+      <div class="installer-grid">
+
+        <div class="installer-block">
+          <p class="installer-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-.15em;margin-right:6px"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            <span data-fr="macOS — Homebrew" data-en="macOS — Homebrew">macOS — Homebrew</span>
+          </p>
+          <div class="installer-cmd">
+            <code class="copy-target">brew uninstall --cask light-cut-soundz</code>
+            <button class="copy-btn" aria-label="Copy">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="installer-block">
+          <p class="installer-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-.15em;margin-right:6px"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg>
+            <span data-fr="Linux — .deb (apt)" data-en="Linux — .deb (apt)">Linux — .deb (apt)</span>
+          </p>
+          <div class="installer-cmd">
+            <code class="copy-target">sudo apt remove light-cut-soundz</code>
+            <button class="copy-btn" aria-label="Copy">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="installer-block">
+          <p class="installer-label">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-.15em;margin-right:6px"><path d="M12.504 0c-.155 0-.315.008-.48.021C7.309.358 3.561 3.522 2.27 7.665c-.01.03-.019.06-.027.09C.594 9.73 0 11.89 0 14.024 0 19.983 5.04 24 10.63 24c1.57 0 3.1-.3 4.52-.84l-.012.006c.8-.3 1.56-.68 2.26-1.13A11.73 11.73 0 0 0 24 12.06C24 5.44 18.854.037 12.504 0zm-.218 2.375c5.16.09 9.12 4.18 9.12 9.295 0 2.77-1.19 5.27-3.08 7.01a9.71 9.71 0 0 1-6.83 2.75c-4.94 0-8.94-3.74-9.27-8.47l-.004-.09c.36-3.67 3.07-6.67 6.63-7.47.45-.1.91-.15 1.43-.02z"/></svg>
+            <span data-fr="Linux — AppImage (manuel)" data-en="Linux — AppImage (manual)">Linux — AppImage (manuel)</span>
+          </p>
+          <div class="installer-cmd">
+            <code class="copy-target">rm ~/.local/bin/lightcutsoundz.AppImage ~/.local/share/applications/lightcutsoundz.desktop</code>
+            <button class="copy-btn" aria-label="Copy">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <img src="favicon.png" alt="LightCutSoundz" width="24" height="24" />
+      <p data-fr="LightCutSoundz est open-source sous licence MIT." data-en="LightCutSoundz is open-source under the MIT license.">LightCutSoundz est open-source sous licence MIT.</p>
+      <a href="https://github.com/light-cut-soundz/light-cut-soundz" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        light-cut-soundz
+      </a>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+name: Ship Implementation
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag being released, e.g. v0.1.9
+        required: true
+        type: string
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  # tauri-action names the bundles after the version in tauri.conf.json, while the
+  # tap workflow derives the version from the git tag. When they disagree the release
+  # publishes assets under a name the cask url cannot resolve, and the failure only
+  # surfaces after the GitHub release is already public.
+  check-version:
+    name: Check the tag matches the manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the tag with tauri.conf.json and Cargo.toml
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          WANT="${TAG#v}"
+          CONF=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
+          CARGO=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "tag=$WANT tauri.conf.json=$CONF Cargo.toml=$CARGO"
+          [ "$WANT" = "$CONF" ] || { echo "::error::tag $WANT does not match tauri.conf.json $CONF"; exit 1; }
+          [ "$WANT" = "$CARGO" ] || { echo "::error::tag $WANT does not match Cargo.toml $CARGO"; exit 1; }
+
+  release:
+    needs: [check-version]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # The sidecar is prefixed so the Linux packages don't claim
+      # /usr/bin/ffmpeg, which the distribution's own ffmpeg package owns.
+      - name: Download ffmpeg sidecar
+        run: |
+          set -euo pipefail
+          mkdir -p src-tauri/binaries
+          BASE="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            curl -fL "$BASE/ffmpeg-darwin-arm64" -o src-tauri/binaries/lightcutsoundz-ffmpeg-aarch64-apple-darwin
+            chmod +x src-tauri/binaries/lightcutsoundz-ffmpeg-aarch64-apple-darwin
+          else
+            curl -fL "$BASE/ffmpeg-linux-x64" -o src-tauri/binaries/lightcutsoundz-ffmpeg-x86_64-unknown-linux-gnu
+            chmod +x src-tauri/binaries/lightcutsoundz-ffmpeg-x86_64-unknown-linux-gnu
+          fi
+
+      - name: Check the updater signing key is available
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set — the build would" \
+                 "ship without latest.json and the in-app updater would 404."
+            exit 1
+          fi
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: LightCutSoundz ${{ inputs.tag }}
+          releaseBody: |
+            ## LightCutSoundz ${{ inputs.tag }}
+
+            ### Téléchargements
+
+            | Plateforme | Fichier |
+            |---|---|
+            | macOS Apple Silicon | `brew install --cask light-cut-soundz/tap/light-cut-soundz` |
+            | Linux AppImage | `LightCutSoundz_*_amd64.AppImage` |
+            | Linux Debian/Ubuntu | `LightCutSoundz_*_amd64.deb` |
+
+            ### Homebrew (macOS)
+            ```
+            brew tap light-cut-soundz/tap
+            brew install --cask light-cut-soundz
+            ```
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  verify-updater:
+    name: Verify updater manifest
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      # The in-app updater reads latest.json from the release assets. Without
+      # this gate a missing manifest only shows up as a silent 404 on users'
+      # machines.
+      - name: Assert latest.json was published
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ASSETS=$(gh release view "${{ inputs.tag }}" \
+            --repo ${{ github.repository }} \
+            --json assets --jq '.assets[].name')
+          echo "$ASSETS"
+          if ! grep -qx 'latest.json' <<<"$ASSETS"; then
+            echo "::error::latest.json is missing from ${{ inputs.tag }} — the in-app updater will 404."
+            exit 1
+          fi
+          if ! grep -q '\.sig$' <<<"$ASSETS"; then
+            echo "::error::no signature asset in ${{ inputs.tag }} — the updater rejects unsigned bundles."
+            exit 1
+          fi
+
+  # La release reste en brouillon le temps de la construction : elle ne devient
+  # publique qu'une fois toutes les plateformes réussies et le manifeste de mise
+  # à jour vérifié, pour qu'une seule d'entre elles qui casse ne laisse jamais
+  # une release incomplète aux utilisateurs.
+  publish-release:
+    name: Publish GitHub Release
+    needs: [release, verify-updater]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark release as latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ inputs.tag }}" --draft=false --latest --repo "${{ github.repository }}"
