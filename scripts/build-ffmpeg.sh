@@ -13,6 +13,10 @@ set -euo pipefail
 
 OUT=${1:?usage: build-ffmpeg.sh <output-file> [work-dir]}
 WORK=${2:-$(mktemp -d)}
+# The build changes directory: both paths must survive that.
+case "$OUT" in /*) ;; *) OUT="$PWD/$OUT" ;; esac
+mkdir -p "$WORK"
+WORK=$(cd "$WORK" && pwd)
 
 FFMPEG_VERSION=7.1.1
 LAME_VERSION=3.100
@@ -77,7 +81,11 @@ fetch "$OGG_URL" "$OGG_SHA256"
 
 echo "== libvorbis ${VORBIS_VERSION}"
 fetch "$VORBIS_URL" "$VORBIS_SHA256"
+# libvorbis 1.3.7's configure passes `-force_cpusubtype_ALL` on macOS, which the
+# current linker rejects ("ld: unknown options"). It is a no-op there anyway.
 (cd "$WORK/src/libvorbis-${VORBIS_VERSION}" &&
+  sed 's/-force_cpusubtype_ALL//g' configure > configure.fixed && mv configure.fixed configure &&
+  chmod +x configure &&
   ./configure --prefix="$PREFIX" --disable-shared --enable-static --disable-oggtest >/dev/null &&
   make -j"$JOBS" >/dev/null && make install >/dev/null)
 
