@@ -44,7 +44,7 @@ sha256_of() {
 fetch() { # url sha256 -> extracted directory name on stdout
   local url=$1 want=$2 file="$WORK/dl/$(basename "$1")"
   mkdir -p "$WORK/dl" "$WORK/src"
-  [ -f "$file" ] || curl -fsSL --retry 3 -o "$file" "$url"
+  [ -f "$file" ] || curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors -o "$file" "$url"
   local got
   got=$(sha256_of "$file")
   if [ "$got" != "$want" ]; then
