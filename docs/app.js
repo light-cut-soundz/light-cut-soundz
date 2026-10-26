@@ -1,6 +1,17 @@
 // ── Language toggle ──────────────────────────────────────────────────────────
 
-let lang = localStorage.getItem('lcs-lang') || 'fr'
+const LANGUAGES = ['fr', 'en']
+
+/** The saved choice if it is one the page speaks, else the browser's language:
+ * an unexpected stored value used to blank every text. */
+function initialLang() {
+  let saved = null
+  try { saved = localStorage.getItem('lcs-lang') } catch { /* storage blocked */ }
+  if (LANGUAGES.includes(saved)) return saved
+  return (navigator.language || '').toLowerCase().startsWith('fr') ? 'fr' : 'en'
+}
+
+let lang = initialLang()
 
 function applyLang() {
   document.documentElement.lang = lang
@@ -22,29 +33,33 @@ function applyLang() {
 
 document.getElementById('langToggle').addEventListener('click', () => {
   lang = lang === 'fr' ? 'en' : 'fr'
-  localStorage.setItem('lcs-lang', lang)
+  try { localStorage.setItem('lcs-lang', lang) } catch { /* storage blocked */ }
   applyLang()
 })
 
 applyLang()
 
-// ── Numéro de la dernière version ────────────────────────────────────────────
-// L'installation passe par des commandes, plus par des liens vers les binaires :
-// il ne reste à récupérer que le numéro affiché sous le titre.
+// ── Latest version number ────────────────────────────────────────────────────
+// Installing goes through commands rather than links to the binaries: the only
+// thing left to fetch is the number shown under the title.
 
 ;(async () => {
   try {
     const res = await fetch('https://api.github.com/repos/light-cut-soundz/light-cut-soundz/releases/latest')
+    // GitHub answers 403 once the 60 requests/hour of an anonymous client are
+    // used, and 404 before the first release: the body is then an error object.
+    if (!res.ok) return
     const rel = await res.json()
+    if (typeof rel.tag_name !== 'string') return
     document.querySelectorAll('.dl-release-version').forEach(el => { el.textContent = rel.tag_name })
-  } catch (e) {
-    document.querySelectorAll('.dl-fallback').forEach(el => { el.style.display = '' })
+  } catch {
+    // Offline: the version number is a nicety, the page works without it.
   }
 })()
 
-/** Le formateur HTML peut replier une commande longue sur deux lignes ; un
- * textContent brut recopierait alors le retour à la ligne et l'indentation dans le
- * presse-papiers. On aplatit toute suite d'espaces. */
+/** The HTML formatter may fold a long command onto two lines; a raw textContent
+ * would then copy the line break and the indentation into the clipboard, so any
+ * run of whitespace is flattened. */
 function commandText(el) {
   return el.textContent.replace(/\s+/g, ' ').trim()
 }
@@ -52,8 +67,8 @@ function commandText(el) {
 // ── Copy install commands ─────────────────────────────────────────────────────
 
 document.querySelectorAll('.copy-btn').forEach(btn => {
-  // Un bouton sans conteneur reconnu renverrait null ici, et l'exception tuerait
-  // tout le script — donc aussi la copie des autres commandes.
+  // A button with no recognised container would get null here, and the
+  // exception would kill the whole script — the copy of the other commands too.
   const cmdEl = btn.closest('.installer-cmd, .install-hero-cmd')?.querySelector('.copy-target')
   if (!cmdEl) return
   btn.addEventListener('click', async () => {

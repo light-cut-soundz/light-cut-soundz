@@ -562,9 +562,9 @@ a { color: inherit; text-decoration: none; }
   }
 }
 
-/* ── Commande unique, mise en avant ──
-   Reprend le patron de light-cut-vidz : une seule commande recommandée, les
-   voies manuelles restant disponibles en dessous. */
+/* ── Single command, highlighted ──
+   Follows the light-cut-vidz pattern: one recommended command, the manual
+   routes staying available below. */
 .install-hero {
   border: 1px solid var(--accent, #c9f25e);
   border-radius: 16px;

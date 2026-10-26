@@ -1,13 +1,13 @@
-//! Menu natif : Fichier (Ouvrir, Quitter) et Aide (Mise à jour, À propos, Langue).
+//! Native menu: File (Open, Quit) and Help (Updates, About, Language).
 //!
-//! Les libellés vivent ici plutôt que côté web parce que la barre de menu est dessinée
-//! par le système : le front ne peut pas la traduire lui-même. Changer de langue
-//! reconstruit le menu — c'est la seule façon d'en modifier les libellés sous GTK.
+//! The labels live here rather than on the web side because the menu bar is drawn
+//! by the system: the front end cannot translate it itself. Changing language
+//! rebuilds the menu — the only way to change its labels under GTK.
 
 use tauri::menu::{CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Runtime};
 
-/// Langue de l'interface. Anglais par défaut, comme partout ailleurs.
+/// Interface language. English by default, as everywhere else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Lang {
     #[default]
@@ -17,7 +17,7 @@ pub enum Lang {
 
 impl Lang {
     /// Tout ce qui n'est pas explicitement `fr` retombe sur l'anglais : le front
-    /// envoie une chaîne libre, et une valeur inconnue ne doit pas casser le menu.
+    /// sends a free-form string, and an unknown value must not break the menu.
     pub fn parse(raw: &str) -> Self {
         if raw == "fr" {
             Lang::Fr
@@ -27,8 +27,9 @@ impl Lang {
     }
 }
 
-/// Libellé d'une entrée de menu. Table exhaustive : ajouter une entrée sans sa
-/// traduction ne compile pas.
+/// Label of a menu entry. An unknown key is returned as is rather than failing
+/// the construction of the menu; the `KEYS` test below checks that every entry
+/// in use is translated in both languages.
 pub fn label(lang: Lang, key: &'static str) -> &'static str {
     match (key, lang) {
         ("file", Lang::En) => "File",
@@ -43,24 +44,50 @@ pub fn label(lang: Lang, key: &'static str) -> &'static str {
         ("check-updates", Lang::Fr) => "Rechercher les mises à jour…",
         ("about", Lang::En) => "About LightCutSoundz",
         ("about", Lang::Fr) => "À propos de LightCutSoundz",
+        ("changelog", Lang::En) => "What's New…",
+        ("changelog", Lang::Fr) => "Nouveautés…",
         ("language", Lang::En) => "Language",
         ("language", Lang::Fr) => "Langue",
+        ("edit", Lang::En) => "Edit",
+        ("edit", Lang::Fr) => "Édition",
+        ("undo", Lang::En) => "Undo",
+        ("undo", Lang::Fr) => "Annuler",
+        ("redo", Lang::En) => "Redo",
+        ("redo", Lang::Fr) => "Rétablir",
+        ("cut", Lang::En) => "Cut",
+        ("cut", Lang::Fr) => "Couper",
+        ("copy", Lang::En) => "Copy",
+        ("copy", Lang::Fr) => "Copier",
+        ("paste", Lang::En) => "Paste",
+        ("paste", Lang::Fr) => "Coller",
+        ("select-all", Lang::En) => "Select All",
+        ("select-all", Lang::Fr) => "Tout sélectionner",
+        ("hide", Lang::En) => "Hide LightCutSoundz",
+        ("hide", Lang::Fr) => "Masquer LightCutSoundz",
+        ("hide-others", Lang::En) => "Hide Others",
+        ("hide-others", Lang::Fr) => "Masquer les autres",
+        ("show-all", Lang::En) => "Show All",
+        ("show-all", Lang::Fr) => "Tout afficher",
+        ("window", Lang::En) => "Window",
+        ("window", Lang::Fr) => "Fenêtre",
+        ("minimize", Lang::En) => "Minimize",
+        ("minimize", Lang::Fr) => "Réduire",
         _ => key,
     }
 }
 
-/// Ce qu'une entrée de menu déclenche. Séparé de la construction du menu pour que la
-/// table soit vérifiable sans lancer l'application.
+/// What a menu entry triggers. Kept apart from the construction of the menu so
+/// that the table can be checked without starting the application.
 #[derive(Debug, PartialEq, Eq)]
 pub enum MenuAction {
-    /// Événement poussé vers le front, avec sa charge utile.
+    /// Event pushed to the front end, with its payload.
     Emit {
         event: &'static str,
         payload: &'static str,
     },
     /// Ferme l'application.
     Quit,
-    /// Entrée inconnue : rien à faire.
+    /// Unknown entry: nothing to do.
     Ignore,
 }
 
@@ -73,6 +100,7 @@ pub fn menu_action(id: &str) -> MenuAction {
         "file-open" => emit("menu-open"),
         "file-quit" => MenuAction::Quit,
         "check-updates" => emit("menu-check-updates"),
+        "changelog" => emit("menu-changelog"),
         "about" => MenuAction::Emit {
             event: "menu-about",
             payload: env!("CARGO_PKG_VERSION"),
@@ -97,15 +125,10 @@ pub fn install<R: Runtime>(app: &AppHandle<R>, lang: Lang) -> tauri::Result<()> 
     let quit = MenuItemBuilder::with_id("file-quit", label(lang, "quit"))
         .accelerator("CmdOrCtrl+Q")
         .build(app)?;
-    let file = SubmenuBuilder::new(app, label(lang, "file"))
-        .item(&open)
-        .separator()
-        .item(&quit)
-        .build()?;
-
     let check_updates =
         MenuItemBuilder::with_id("check-updates", label(lang, "check-updates")).build(app)?;
     let about = MenuItemBuilder::with_id("about", label(lang, "about")).build(app)?;
+    let changelog = MenuItemBuilder::with_id("changelog", label(lang, "changelog")).build(app)?;
     let lang_en = CheckMenuItemBuilder::with_id("lang-en", "English")
         .checked(lang == Lang::En)
         .build(app)?;
@@ -116,20 +139,66 @@ pub fn install<R: Runtime>(app: &AppHandle<R>, lang: Lang) -> tauri::Result<()> 
         .item(&lang_en)
         .item(&lang_fr)
         .build()?;
+
+    let file = SubmenuBuilder::new(app, label(lang, "file")).item(&open);
     let help = SubmenuBuilder::new(app, label(lang, "help"))
         .item(&check_updates)
-        .separator()
-        .item(&about)
-        .separator()
-        .item(&language)
-        .build()?;
+        .item(&changelog);
 
-    let menu = MenuBuilder::new(app).item(&file).item(&help).build()?;
+    // On macOS the first submenu is the application menu: Quit and About live
+    // there, and the text fields get no copy/paste or undo until an Edit menu
+    // declares them.
+    #[cfg(target_os = "macos")]
+    let menu = {
+        use tauri::menu::PredefinedMenuItem as P;
+        let t = |key| Some(label(lang, key));
+        let app_menu = SubmenuBuilder::new(app, "LightCutSoundz")
+            .item(&about)
+            .separator()
+            .item(&P::hide(app, t("hide"))?)
+            .item(&P::hide_others(app, t("hide-others"))?)
+            .item(&P::show_all(app, t("show-all"))?)
+            .separator()
+            .item(&quit)
+            .build()?;
+        let edit = SubmenuBuilder::new(app, label(lang, "edit"))
+            .item(&P::undo(app, t("undo"))?)
+            .item(&P::redo(app, t("redo"))?)
+            .separator()
+            .item(&P::cut(app, t("cut"))?)
+            .item(&P::copy(app, t("copy"))?)
+            .item(&P::paste(app, t("paste"))?)
+            .item(&P::select_all(app, t("select-all"))?)
+            .build()?;
+        let window = SubmenuBuilder::new(app, label(lang, "window"))
+            .item(&P::minimize(app, t("minimize"))?)
+            .build()?;
+        let help = help.separator().item(&language).build()?;
+        MenuBuilder::new(app)
+            .item(&app_menu)
+            .item(&file.build()?)
+            .item(&edit)
+            .item(&window)
+            .item(&help)
+            .build()?
+    };
+    #[cfg(not(target_os = "macos"))]
+    let menu = {
+        let file = file.separator().item(&quit).build()?;
+        let help = help
+            .separator()
+            .item(&about)
+            .separator()
+            .item(&language)
+            .build()?;
+        MenuBuilder::new(app).item(&file).item(&help).build()?
+    };
+
     app.set_menu(menu)?;
     Ok(())
 }
 
-/// Applique l'action d'une entrée de menu.
+/// Applies the action of a menu entry.
 pub fn handle<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match menu_action(id) {
         MenuAction::Emit { event, payload } => {
@@ -140,8 +209,8 @@ pub fn handle<R: Runtime>(app: &AppHandle<R>, id: &str) {
     }
 }
 
-/// Redessine le menu dans la langue demandée. Appelée par le front au démarrage avec
-/// la langue retenue, puis à chaque changement.
+/// Redraws the menu in the requested language. Called by the front end at startup
+/// with the saved language, then at every change.
 #[tauri::command]
 pub fn set_menu_language(app: AppHandle, lang: String) -> Result<(), String> {
     install(&app, Lang::parse(&lang)).map_err(|e| e.to_string())
@@ -151,7 +220,7 @@ pub fn set_menu_language(app: AppHandle, lang: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    // ── langue ───────────────────────────────────────────────────────────────
+    // ── language ───────────────────────────────────────────────────────────────
 
     #[test]
     fn the_menu_speaks_english_unless_told_otherwise() {
@@ -172,14 +241,15 @@ mod tests {
 
     #[test]
     fn each_code_the_menu_sends_is_understood_when_it_comes_back() {
-        // Les charges utiles de `menu_action` sont les seules entrées possibles.
+        // The payloads of `menu_action` are the only possible inputs.
         assert_eq!(Lang::parse("en"), Lang::En);
         assert_eq!(Lang::parse("fr"), Lang::Fr);
     }
 
-    // ── libellés ─────────────────────────────────────────────────────────────
+    // ── labels ─────────────────────────────────────────────────────────────
 
-    const KEYS: [&str; 7] = [
+    const KEYS: [&str; 20] = [
+        "changelog",
         "file",
         "open",
         "quit",
@@ -187,14 +257,26 @@ mod tests {
         "check-updates",
         "about",
         "language",
+        "edit",
+        "undo",
+        "redo",
+        "cut",
+        "copy",
+        "paste",
+        "select-all",
+        "hide",
+        "hide-others",
+        "show-all",
+        "window",
+        "minimize",
     ];
 
     #[test]
     fn every_entry_is_written_in_both_languages() {
         for key in KEYS {
             for lang in [Lang::En, Lang::Fr] {
-                // Une clé sans traduction ressort telle quelle : c'est ce qu'il ne
-                // faut pas voir dans la barre de menu.
+                // A key with no translation comes back as is: exactly what must
+                // not show in the menu bar.
                 assert_ne!(label(lang, key), key, "{key} manque en {:?}", lang);
             }
         }
@@ -202,7 +284,7 @@ mod tests {
 
     #[test]
     fn the_two_languages_say_different_things() {
-        // Sauf pour les entrées qui s'écrivent pareil — il n'y en a aucune ici.
+        // Except for entries spelled the same in both — there are none here.
         for key in KEYS {
             assert_ne!(label(Lang::En, key), label(Lang::Fr, key), "{key}");
         }
@@ -228,6 +310,11 @@ mod tests {
     #[test]
     fn checking_for_updates_is_handed_to_the_front() {
         assert_eq!(menu_action("check-updates"), emit("menu-check-updates"));
+    }
+
+    #[test]
+    fn the_changelog_is_handed_to_the_front() {
+        assert_eq!(menu_action("changelog"), emit("menu-changelog"));
     }
 
     #[test]
@@ -263,10 +350,10 @@ mod tests {
 
     // ── construction ─────────────────────────────────────────────────────────
 
-    // muda refuse de construire un menu hors du thread principal sous macOS, et
-    // `cargo test` donne un thread à chaque test. La construction n'est donc
-    // vérifiable que sur les autres plateformes ; la table des libellés et celle
-    // des actions, elles, sont testées partout.
+    // muda refuses to build a menu off the main thread on macOS, and
+    // `cargo test` gives every test its own thread. Building is therefore only
+    // checkable on the other platforms; the label table and the action table
+    // are tested everywhere.
     #[cfg_attr(target_os = "macos", ignore)]
     #[test]
     fn the_menu_can_be_built_in_either_language() {
@@ -276,10 +363,6 @@ mod tests {
         }
     }
 
-    // muda refuse de construire un menu hors du thread principal sous macOS, et
-    // `cargo test` donne un thread à chaque test. La construction n'est donc
-    // vérifiable que sur les autres plateformes ; la table des libellés et celle
-    // des actions, elles, sont testées partout.
     #[cfg_attr(target_os = "macos", ignore)]
     #[test]
     fn switching_language_redraws_the_menu_rather_than_failing() {

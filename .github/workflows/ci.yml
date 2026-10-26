@@ -6,33 +6,42 @@ on:
   pull_request:
     branches: [main]
 
+# Third-party actions are pinned to a commit: a moved tag cannot change what runs
+# here. Dependabot (.github/dependabot.yml) proposes the updates.
+permissions:
+  contents: read
+
 jobs:
   rust:
     name: Rust lint & tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Install Tauri system dependencies
+      # ffmpeg is also what the export tests run against; they skip themselves
+      # when it is missing, which would silently drop the coverage.
+      - name: Install Tauri system dependencies and ffmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            ffmpeg
 
       - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, pinned
         with:
+          toolchain: stable
           components: rustfmt, clippy, llvm-tools-preview
 
       - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       # tauri-build resolves `externalBin` at build-script time and fails if the
       # sidecar is missing. Lint and tests never execute it, so a stub is enough
-      # here; the release workflow downloads the real binary.
+      # here; the release workflow builds the real binary.
       - name: Stub the ffmpeg sidecar
         run: |
           mkdir -p src-tauri/binaries
@@ -45,8 +54,10 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install cargo-llvm-cov and cargo-audit
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-llvm-cov,cargo-audit
 
       - name: Run tests with coverage
         run: |
@@ -54,15 +65,20 @@ jobs:
             --ignore-filename-regex 'src-tauri/src/main\.rs' \
             --fail-under-lines 90
 
+      # Known vulnerabilities in the locked dependencies fail the build;
+      # "unmaintained" notices stay warnings.
+      - name: Audit Rust dependencies
+        run: cargo audit
+
   js:
     name: JS lint & tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -76,3 +92,89 @@ jobs:
 
       - name: Build the frontend
         run: npm run build
+
+      # What ships to users is the production dependencies; the dev tooling is
+      # kept current by Dependabot.
+      - name: Audit shipped JS dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  ffmpeg:
+    name: Bundled ffmpeg builds (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, ubuntu-22.04-arm, macos-latest]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install pkg-config (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pkgconf
+
+      - name: Cache the built binary
+        id: cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ffmpeg-out
+          key: ffmpeg-${{ matrix.platform }}-${{ hashFiles('scripts/build-ffmpeg.sh') }}
+
+      - name: Build the LGPL, audio-only ffmpeg
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
+        run: scripts/build-ffmpeg.sh ffmpeg-out/lightcutsoundz-ffmpeg "$RUNNER_TEMP/ffmpeg-build"
+
+      - name: Check it is LGPL and encodes every export format
+        run: |
+          set -euo pipefail
+          FF=ffmpeg-out/lightcutsoundz-ffmpeg
+          $FF -hide_banner -version | grep -q 'enable-libmp3lame'
+          if $FF -hide_banner -version | grep -Eq -- '--enable-(gpl|nonfree|version3)|x264|x265'; then
+            echo "::error::the bundled ffmpeg is not LGPL-only"; exit 1
+          fi
+          for ext in mp3 flac ogg m4a; do
+            case $ext in
+              mp3)  args="-c:a libmp3lame -f mp3" ;;
+              flac) args="-c:a flac -f flac" ;;
+              ogg)  args="-c:a libvorbis -f ogg" ;;
+              m4a)  args="-c:a aac -f ipod" ;;
+            esac
+            head -c 400000 /dev/zero | $FF -y -v error -f f32le -ar 44100 -ac 2 -i pipe:0 \
+              $args "file:$RUNNER_TEMP/probe.$ext"
+            test -s "$RUNNER_TEMP/probe.$ext"
+          done
+          ls -l $FF
+
+  licenses:
+    name: Third-party licences are up to date
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, pinned
+        with:
+          toolchain: stable
+
+      - name: Install cargo-about
+        uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2.87.31
+        with:
+          tool: cargo-about
+
+      - name: Stub the ffmpeg sidecar
+        run: |
+          mkdir -p src-tauri/binaries
+          printf '#!/bin/sh\nexit 1\n' > src-tauri/binaries/lightcutsoundz-ffmpeg-x86_64-unknown-linux-gnu
+
+      - name: Regenerate and compare
+        run: |
+          set -euo pipefail
+          scripts/third-party-licenses.sh THIRD_PARTY_LICENSES.html
+          git diff --exit-code -- THIRD_PARTY_LICENSES.html \
+            || { echo "::error::THIRD_PARTY_LICENSES.html is stale — run scripts/third-party-licenses.sh"; exit 1; }

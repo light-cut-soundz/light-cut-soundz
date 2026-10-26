@@ -1,0 +1,7 @@
+[advisories]
+# `zip` only comes in through tauri-plugin-updater's Windows-only dependency
+# (`[target.'cfg(target_os = "windows")'.dependencies]`): `cargo tree -i zip
+# --target x86_64-unknown-linux-gnu` and `--target aarch64-apple-darwin` find
+# nothing, and the app is not built for Windows. Re-check when the updater
+# plugin moves to zip 9 and drop these.
+ignore = ["RUSTSEC-2026-0367", "RUSTSEC-2026-0368", "RUSTSEC-2026-0369"]

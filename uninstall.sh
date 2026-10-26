@@ -11,7 +11,11 @@
 # something that was never installed is not an error — the script reports what it
 # actually found.
 #
-# User settings and projects are left untouched.
+# User settings and projects are left untouched, unless --purge is given:
+#
+#   curl -fsSL …/uninstall.sh | bash -s -- --purge
+#
+# which also deletes the data the app's WebView keeps (the saved language).
 set -eo pipefail
 
 REPO="light-cut-soundz/light-cut-soundz"
@@ -20,9 +24,17 @@ CASK="light-cut-soundz"
 APP_NAME="LightCutSoundz"
 APP_SLUG="lightcutsoundz"
 DEB_PACKAGE="light-cut-soundz"
+APP_ID="dev.lightcutsoundz"
 ICON_SIZE="512x512"
 
 removed=0
+purge=0
+for arg in "$@"; do
+  case "$arg" in
+    --purge) purge=1 ;;
+    *) printf 'error: unknown option: %s\n' "$arg" >&2; exit 1 ;;
+  esac
+done
 
 log() { printf '==> %s\n' "$*"; }
 note() { printf '    %s\n' "$*"; }
@@ -50,6 +62,34 @@ uninstall_deb() {
   log "Removing the $DEB_PACKAGE package (sudo required)…"
   sudo apt-get remove -y "$DEB_PACKAGE"
   removed=1
+}
+
+uninstall_rpm() {
+  command -v rpm >/dev/null 2>&1 || return 0
+  rpm -q "$DEB_PACKAGE" >/dev/null 2>&1 || return 0
+  log "Removing the $DEB_PACKAGE package (sudo required)…"
+  if command -v dnf >/dev/null 2>&1; then
+    sudo dnf remove -y "$DEB_PACKAGE"
+  elif command -v zypper >/dev/null 2>&1; then
+    sudo zypper --non-interactive remove "$DEB_PACKAGE"
+  else
+    sudo rpm -e "$DEB_PACKAGE"
+  fi
+  removed=1
+}
+
+# What the WebView and the app leave in the user's profile.
+purge_user_data() {
+  [ "$purge" -eq 1 ] || return 0
+  for dir in \
+    "$HOME/.local/share/$APP_ID" "$HOME/.cache/$APP_ID" "$HOME/.config/$APP_ID" \
+    "$HOME/Library/WebKit/$APP_ID" "$HOME/Library/Application Support/$APP_ID" \
+    "$HOME/Library/Caches/$APP_ID" "$HOME/Library/Saved Application State/$APP_ID.savedState"; do
+    [ -e "$dir" ] || continue
+    log "Removing $dir…"
+    rm -rf "$dir"
+    removed=1
+  done
 }
 
 uninstall_appimage() {
@@ -81,6 +121,7 @@ case "$(uname -s)" in
   Linux)
     # A machine can carry either route — or both, after switching. Undo whatever is there.
     uninstall_deb
+    uninstall_rpm
     uninstall_appimage
     ;;
   *)
@@ -88,9 +129,11 @@ case "$(uname -s)" in
     ;;
 esac
 
+purge_user_data
+
 if [ "$removed" -eq 1 ]; then
   log "Done. $APP_NAME has been removed."
-  note "Your settings were left in place."
+  [ "$purge" -eq 1 ] || note "Your settings were left in place (run with --purge to delete them too)."
 else
   log "Nothing to remove — $APP_NAME does not appear to be installed."
 fi

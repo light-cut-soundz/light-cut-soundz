@@ -25,7 +25,11 @@ jobs:
     name: Check the tag matches the manifests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # The tag, not the branch that happened to trigger the run: a manual
+      # release of an existing tag would otherwise build and check `main`.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.tag }}
 
       - name: Compare the tag with tauri.conf.json and Cargo.toml
         env:
@@ -35,9 +39,16 @@ jobs:
           WANT="${TAG#v}"
           CONF=$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json'))['version'])")
           CARGO=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
-          echo "tag=$WANT tauri.conf.json=$CONF Cargo.toml=$CARGO"
+          NPM=$(python3 -c "import json;print(json.load(open('package.json'))['version'])")
+          echo "tag=$WANT tauri.conf.json=$CONF Cargo.toml=$CARGO package.json=$NPM"
           [ "$WANT" = "$CONF" ] || { echo "::error::tag $WANT does not match tauri.conf.json $CONF"; exit 1; }
           [ "$WANT" = "$CARGO" ] || { echo "::error::tag $WANT does not match Cargo.toml $CARGO"; exit 1; }
+          [ "$WANT" = "$NPM" ] || { echo "::error::tag $WANT does not match package.json $NPM"; exit 1; }
+
+      # The notes shown before an update come from the changelogs: a release
+      # without an entry in both languages is refused here, not after the build.
+      - name: Check both changelogs have an entry for the tag
+        run: scripts/release-notes.sh "${{ inputs.tag }}" > /dev/null
 
   release:
     needs: [check-version]
@@ -46,30 +57,38 @@ jobs:
       matrix:
         include:
           - platform: ubuntu-22.04
+            triple: x86_64-unknown-linux-gnu
+            args: ''
+          - platform: ubuntu-22.04-arm
+            triple: aarch64-unknown-linux-gnu
             args: ''
           - platform: macos-latest
+            triple: aarch64-apple-darwin
             args: '--target aarch64-apple-darwin'
 
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          node-version: 20
+          ref: ${{ inputs.tag }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
           cache: npm
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch, pinned
         with:
+          toolchain: stable
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Install Linux system dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(matrix.platform, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -83,18 +102,29 @@ jobs:
 
       # The sidecar is prefixed so the Linux packages don't claim
       # /usr/bin/ffmpeg, which the distribution's own ffmpeg package owns.
-      - name: Download ffmpeg sidecar
+      #
+      # It is built from the pinned, checksummed upstream sources rather than
+      # downloaded from a third party: LGPL only (no x264/x265, so the app's
+      # licence is respected) and audio only (a few MB instead of ~80).
+      - name: Install pkg-config (macOS)
+        if: runner.os == 'macOS'
+        run: brew install pkgconf
+
+      - name: Restore the ffmpeg sidecar
+        id: ffmpeg-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: src-tauri/binaries
+          key: ffmpeg-sidecar-${{ matrix.triple }}-${{ hashFiles('scripts/build-ffmpeg.sh') }}
+
+      - name: Build the ffmpeg sidecar
+        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '11.0'
         run: |
-          set -euo pipefail
-          mkdir -p src-tauri/binaries
-          BASE="https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1"
-          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            curl -fL "$BASE/ffmpeg-darwin-arm64" -o src-tauri/binaries/lightcutsoundz-ffmpeg-aarch64-apple-darwin
-            chmod +x src-tauri/binaries/lightcutsoundz-ffmpeg-aarch64-apple-darwin
-          else
-            curl -fL "$BASE/ffmpeg-linux-x64" -o src-tauri/binaries/lightcutsoundz-ffmpeg-x86_64-unknown-linux-gnu
-            chmod +x src-tauri/binaries/lightcutsoundz-ffmpeg-x86_64-unknown-linux-gnu
-          fi
+          scripts/build-ffmpeg.sh \
+            "src-tauri/binaries/lightcutsoundz-ffmpeg-${{ matrix.triple }}" \
+            "$RUNNER_TEMP/ffmpeg-build"
 
       - name: Check the updater signing key is available
         env:
@@ -106,8 +136,20 @@ jobs:
             exit 1
           fi
 
+      # Becomes the release body, and so the `notes` of latest.json that the
+      # updater hands to the app. One block per language, `<!-- en -->` / `<!-- fr -->`.
+      - name: Write the release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          {
+            echo 'body<<NOTES_EOF'
+            scripts/release-notes.sh "${{ inputs.tag }}"
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -116,15 +158,17 @@ jobs:
           tagName: ${{ inputs.tag }}
           releaseName: LightCutSoundz ${{ inputs.tag }}
           releaseBody: |
-            ## LightCutSoundz ${{ inputs.tag }}
+            ${{ steps.notes.outputs.body }}
 
-            ### Téléchargements
+            ---
 
-            | Plateforme | Fichier |
+            ### Downloads
+
+            | Platform | File |
             |---|---|
             | macOS Apple Silicon | `brew install --cask light-cut-soundz/tap/light-cut-soundz` |
-            | Linux AppImage | `LightCutSoundz_*_amd64.AppImage` |
-            | Linux Debian/Ubuntu | `LightCutSoundz_*_amd64.deb` |
+            | Linux AppImage (x86_64 / ARM64) | `LightCutSoundz_*_amd64.AppImage` / `LightCutSoundz_*_aarch64.AppImage` |
+            | Linux Debian/Ubuntu (x86_64 / ARM64) | `LightCutSoundz_*_amd64.deb` / `LightCutSoundz_*_arm64.deb` |
 
             ### Homebrew (macOS)
             ```
@@ -161,13 +205,32 @@ jobs:
             exit 1
           fi
 
-  # La release reste en brouillon le temps de la construction : elle ne devient
-  # publique qu'une fois toutes les plateformes réussies et le manifeste de mise
-  # à jour vérifié, pour qu'une seule d'entre elles qui casse ne laisse jamais
-  # une release incomplète aux utilisateurs.
+  # install.sh checks what it downloads against this file, so it is published
+  # with the release (still a draft) and before anyone can see it.
+  checksums:
+    name: Publish SHA256SUMS
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hash the installable assets and attach the list
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir assets && cd assets
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" \
+            --pattern '*.deb' --pattern '*.rpm' --pattern '*.AppImage'
+          [ -n "$(ls)" ] || { echo "::error::no installable asset found"; exit 1; }
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "${{ inputs.tag }}" SHA256SUMS --repo "${{ github.repository }}" --clobber
+
+  # The release stays a draft while it is built: it only becomes public once
+  # every platform has succeeded and the updater manifest is verified, so that a
+  # single platform breaking never leaves users with an incomplete release.
   publish-release:
     name: Publish GitHub Release
-    needs: [release, verify-updater]
+    needs: [release, verify-updater, checksums]
     runs-on: ubuntu-latest
     steps:
       - name: Mark release as latest

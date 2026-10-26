@@ -1,5 +1,5 @@
 use crate::audio::AudioBuffer;
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 /// −1 dBFS. Leaving a decibel of headroom keeps the inter-sample peaks that
 /// MP3 and OGG encoders introduce below full scale.
@@ -13,8 +13,10 @@ pub fn normalize(buf: &mut AudioBuffer) -> Result<()> {
         .map(|s| s.abs())
         .fold(0.0f32, f32::max);
 
+    // Silence stays silence: there is nothing to scale, and failing the whole
+    // export because the kept region happens to be quiet helps no one.
     if peak < 1e-8 {
-        bail!("Audio is silent, cannot normalize");
+        return Ok(());
     }
     let gain = TARGET_PEAK / peak;
     for ch in buf.samples.iter_mut() {
@@ -69,21 +71,23 @@ mod tests {
     }
 
     #[test]
-    fn normalize_silent_errors() {
+    fn normalize_leaves_silence_untouched() {
         let mut buf = AudioBuffer {
             samples: vec![vec![0.0; 100]],
             sample_rate: 44100,
         };
-        assert!(normalize(&mut buf).is_err());
+        normalize(&mut buf).unwrap();
+        assert!(buf.samples[0].iter().all(|s| *s == 0.0));
     }
 
     #[test]
-    fn normalize_empty_errors() {
+    fn normalize_empty_is_a_no_op() {
         let mut buf = AudioBuffer {
             samples: vec![],
             sample_rate: 44100,
         };
-        assert!(normalize(&mut buf).is_err());
+        normalize(&mut buf).unwrap();
+        assert_eq!(buf.channels(), 0);
     }
 
     #[test]

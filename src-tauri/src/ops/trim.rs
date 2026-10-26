@@ -1,10 +1,21 @@
 use crate::audio::AudioBuffer;
-use anyhow::{bail, Result};
+use crate::error::coded;
+use anyhow::Result;
 
 pub fn trim(buf: &mut AudioBuffer, start_secs: f64, end_secs: f64) -> Result<()> {
     let total = buf.duration_secs();
-    if start_secs < 0.0 || end_secs <= start_secs || end_secs > total + 0.001 {
-        bail!("Invalid trim range {start_secs:.3}:{end_secs:.3} (audio is {total:.3}s)");
+    // Written so that NaN fails every comparison and lands in the error branch.
+    let valid = start_secs >= 0.0 && end_secs > start_secs && end_secs <= total + 0.001;
+    if !valid {
+        return Err(coded(
+            "trim_range",
+            &[
+                ("start", format!("{start_secs:.2}")),
+                ("end", format!("{end_secs:.2}")),
+                ("total", format!("{total:.2}")),
+            ],
+            format!("Invalid trim range {start_secs:.3}:{end_secs:.3} (audio is {total:.3}s)"),
+        ));
     }
     let frames = buf.num_frames();
     // Both bounds are clamped: the 1ms tolerance above is worth 44 frames at
@@ -14,8 +25,16 @@ pub fn trim(buf: &mut AudioBuffer, start_secs: f64, end_secs: f64) -> Result<()>
         .min(frames)
         .max(start_frame);
 
+    // The 1ms tolerance can also collapse a tiny range onto a single frame
+    // boundary; exporting zero frames would "succeed" with an empty file.
+    if end_frame <= start_frame {
+        return Err(coded("trim_empty", &[], "Trim range is empty"));
+    }
+
+    // In place: a copy would briefly hold the audio twice.
     for ch in buf.samples.iter_mut() {
-        *ch = ch[start_frame..end_frame].to_vec();
+        ch.truncate(end_frame);
+        ch.drain(..start_frame);
     }
     Ok(())
 }
@@ -72,11 +91,28 @@ mod tests {
     }
 
     #[test]
-    fn trim_within_the_tolerance_window_does_not_panic() {
-        // Regression: start rounded to frame 44122 of a 44100-frame buffer.
+    fn trim_within_the_tolerance_window_is_an_empty_range_not_a_panic() {
+        // Regression: start rounded to frame 44122 of a 44100-frame buffer. The
+        // range then holds no audio, which must be refused rather than exported.
         let mut buf = make_buf(44_100, 44_100);
-        trim(&mut buf, 1.0005, 1.001).unwrap();
-        assert_eq!(buf.num_frames(), 0);
+        let err = trim(&mut buf, 1.0005, 1.001).unwrap_err();
+        assert_eq!(crate::error::CmdError::from(err).code, "trim_empty");
+    }
+
+    #[test]
+    fn trim_rejects_nan_bounds() {
+        let mut buf = make_buf(10, 10);
+        assert!(trim(&mut buf, f64::NAN, 0.5).is_err());
+        assert!(trim(&mut buf, 0.0, f64::NAN).is_err());
+    }
+
+    #[test]
+    fn an_invalid_range_carries_its_numbers_for_the_translated_message() {
+        let mut buf = make_buf(10, 10);
+        let e = crate::error::CmdError::from(trim(&mut buf, 0.5, 0.5).unwrap_err());
+        assert_eq!(e.code, "trim_range");
+        assert_eq!(e.params["start"], "0.50");
+        assert_eq!(e.params["total"], "1.00");
     }
 
     #[test]
