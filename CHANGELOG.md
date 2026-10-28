@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-28
+
+### Added
+- Cuts: drag on the timeline to mark the parts to remove, as many as you like; resize or move them, or edit their times. The seek bar, the preview and the export all skip them. The keys I and O mark a cut at the playhead.
+- A seek bar under the player, and a live frequency visualisation while a file plays.
+- Undo and Redo buttons, and the Open and Export buttons, in the header.
+- The light and dark themes now follow View ▸ Theme everywhere, whatever the system's.
+- The recent files list on the home screen follows the one in the File menu when it is cleared.
+
+### Changed
+- The editor has the layout of LightCutVidz: the settings in a sidebar on the right, the seek bar under the player, the waveform below as the timeline.
+- Cuts replace the trim range, and the sidebar explains how to make them.
+- The export options are in a dialog opened by the Export button, instead of a bar at the bottom.
+- The filter type and the fade curve are chosen with buttons, and the speed with the same slider and presets as LightCutVidz (0.25x to 4x).
+- Buttons, labels and menus take the look of LightCutVidz; the Theme and Language menus show radio buttons.
+
 ## [1.1.0] - 2026-10-26
 
 ### Added

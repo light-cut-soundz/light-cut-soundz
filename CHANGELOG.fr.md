@@ -6,6 +6,22 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-28
+
+### Ajouté
+- Coupes : on glisse sur la timeline pour marquer les parties à retirer, autant qu'on veut ; on les redimensionne, on les déplace ou on modifie leurs temps. La barre de lecture, l'aperçu et l'export les sautent. Les touches I et O marquent une coupe à la tête de lecture.
+- Une barre de lecture sous le lecteur, et une visualisation des fréquences en direct pendant la lecture.
+- Les boutons Annuler et Rétablir, ainsi qu'Ouvrir et Exporter, dans l'en-tête.
+- Les thèmes clair et sombre suivent maintenant Affichage ▸ Thème partout, quel que soit celui du système.
+- La liste des fichiers récents de l'accueil suit celle du menu Fichier quand on l'efface.
+
+### Modifié
+- L'éditeur reprend la disposition de LightCutVidz : les réglages dans une barre latérale à droite, la barre de lecture sous le lecteur, la forme d'onde en dessous comme timeline.
+- Les coupes remplacent la plage de rognage, et la barre latérale explique comment les faire.
+- Les options d'export sont dans une fenêtre ouverte par le bouton Exporter, au lieu d'une barre en bas.
+- Le type de filtre et la courbe des fondus se choisissent avec des boutons, et la vitesse avec le même curseur et les mêmes préréglages que LightCutVidz (de 0.25x à 4x).
+- Les boutons, les libellés et les menus prennent l'aspect de LightCutVidz ; les menus Thème et Langue affichent des boutons radio.
+
 ## [1.1.0] - 2026-10-26
 
 ### Ajouté

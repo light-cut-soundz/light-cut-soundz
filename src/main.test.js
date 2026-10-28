@@ -69,7 +69,7 @@ function fakeAudioBuffer() {
     numberOfChannels: 1,
     duration: 12.5,
     sampleRate: 44100,
-    getChannelData: vi.fn(() => new Float32Array([0, 0.5, -0.25])),
+    getChannelData: vi.fn(() => new Float32Array(Math.round(12.5 * 44100)).fill(0.5)),
   }
 }
 
@@ -97,7 +97,7 @@ function installAudioContext() {
     buffer: null,
     onended: null,
   })
-  audio = { ctx: null, gains: [], filters: [], sources: [] }
+  audio = { ctx: null, gains: [], filters: [], sources: [], analysers: [], builtBuffers: [] }
   const track = (list) => () => {
     const n = node()
     list.push(n)
@@ -114,6 +114,29 @@ function installAudioContext() {
     createGain = track(audio.gains)
     createBiquadFilter = track(audio.filters)
     createBufferSource = track(audio.sources)
+    createAnalyser = () => {
+      const a = {
+        ...node(),
+        fftSize: 0,
+        smoothingTimeConstant: 0,
+        frequencyBinCount: 256,
+        getByteFrequencyData: vi.fn((data) => data.fill(128)),
+      }
+      audio.analysers.push(a)
+      return a
+    }
+    createBuffer = vi.fn((channels, length, rate) => {
+      const data = Array.from({ length: channels }, () => new Float32Array(length))
+      const buffer = {
+        numberOfChannels: channels,
+        length,
+        sampleRate: rate,
+        duration: length / rate,
+        getChannelData: (ch) => data[ch],
+      }
+      audio.builtBuffers.push(buffer)
+      return buffer
+    })
     decodeAudioData = vi.fn(() => {
       audio.lastBuffer = fakeAudioBuffer()
       return Promise.resolve(audio.lastBuffer)
@@ -168,6 +191,8 @@ function installCanvas() {
     setLineDash: vi.fn(),
     arcTo: vi.fn(),
     closePath: vi.fn(),
+    clearRect: vi.fn(),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 0,
@@ -184,11 +209,29 @@ function sizeCanvas() {
   Object.defineProperty(canvas, 'clientHeight', { value: CANVAS_H, configurable: true })
   canvas.getBoundingClientRect = () => ({ left: 0, top: 0, width: CANVAS_W, height: CANVAS_H })
   canvas.getContext = vi.fn(() => ctx2d)
+  // The cuts are drawn, and hit-tested, over the same box as the waveform.
+  $('tl-cuts').getBoundingClientRect = () => ({ left: 0, top: 0, width: CANVAS_W, height: CANVAS_H })
+  $('seekbar').getBoundingClientRect = () => ({ left: 0, top: 0, width: CANVAS_W, height: 12 })
+  const viz = $('spectrum')
+  Object.defineProperty(viz, 'clientWidth', { value: CANVAS_W, configurable: true })
+  Object.defineProperty(viz, 'clientHeight', { value: CANVAS_H, configurable: true })
   return canvas
 }
 
 /** clientX for a given time on the waveform, using the fixture's 12.5 s duration. */
 const xForTime = (t) => (t / AUDIO_INFO.duration) * CANVAS_W
+
+/** A pointer event on `target`; the app listens to the names, not to the class. */
+function pointer(type, x, target = $('tl-track')) {
+  target.dispatchEvent(new MouseEvent(type, { clientX: x, bubbles: true, button: 0 }))
+}
+
+/** Marks the part from `from` to `to` seconds as cut, by dragging over the track. */
+function cutBetween(from, to) {
+  pointer('pointerdown', xForTime(from))
+  pointer('pointermove', xForTime(to))
+  pointer('pointerup', xForTime(to))
+}
 
 /** Mounts the real markup and imports `main.js` fresh. */
 async function bootApp() {
@@ -315,14 +358,15 @@ describe('main — loading a file', () => {
     expect($('time-current').textContent).toBe('0:00')
   })
 
-  it('seeds the trim fields from the duration', async () => {
+  it('starts with nothing cut, and the whole file on the seek bar', async () => {
     await bootApp()
 
     await loadAudio()
 
-    expect($('trim-start').value).toBe('0')
-    expect($('trim-end').value).toBe('12.5')
-    expect($('trim-end').max).toBe('12.5')
+    expect(document.querySelectorAll('.tl-cut')).toHaveLength(0)
+    expect($('cut-count').classList.contains('hidden')).toBe(true)
+    expect($('time-total').textContent).toBe('0:12')
+    expect($('seekbar').getAttribute('aria-valuemax')).toBe('13')
   })
 
   it('loads nothing when the picker is dismissed', async () => {
@@ -343,6 +387,248 @@ describe('main — loading a file', () => {
 
     await vi.waitFor(() => expect($('toast').textContent).toContain('unsupported codec'))
     expect($('toast').className).toContain('error')
+  })
+})
+
+describe('main — home screen', () => {
+  const RECENT = [
+    { path: '/home/me/music/a.wav', name: 'a.wav', dir: '/home/me/music' },
+    { path: '/home/me/music/b.mp3', name: 'b.mp3', dir: '/home/me/music' },
+  ]
+
+  /** `invoke` answering `get_recent` with a list that `forget_recent` shortens. */
+  function withRecent(list = RECENT) {
+    let current = list
+    invoke.mockImplementation((cmd, args) => {
+      if (cmd === 'load_audio') return Promise.resolve(AUDIO_INFO)
+      if (cmd === 'get_recent') return Promise.resolve(current)
+      if (cmd === 'forget_recent') {
+        current = args.path ? current.filter((i) => i.path !== args.path) : []
+      }
+      return Promise.resolve(undefined)
+    })
+  }
+
+  it('hides the header bar until a file is open', async () => {
+    await bootApp()
+    expect(document.querySelector('header').classList.contains('hidden')).toBe(true)
+
+    await loadAudio()
+    expect(document.querySelector('header').classList.contains('hidden')).toBe(false)
+  })
+
+  it('shows the app name and no logo bar', async () => {
+    await bootApp()
+    expect(document.querySelector('.drop-name').textContent).toBe('LightCutSoundz')
+    expect(document.querySelector('.logo')).toBeNull()
+  })
+
+  it('hides the recent list when there is nothing to show', async () => {
+    await bootApp()
+    expect($('recent').classList.contains('hidden')).toBe(true)
+  })
+
+  it('lists the recent files with their folder', async () => {
+    withRecent()
+    await bootApp()
+
+    await vi.waitFor(() => expect($('recent').classList.contains('hidden')).toBe(false))
+    const rows = [...document.querySelectorAll('.recent-item')]
+    expect(rows.map((r) => r.querySelector('.recent-name').textContent)).toEqual(['a.wav', 'b.mp3'])
+    expect(rows[0].querySelector('.recent-kind').textContent).toBe('WAV')
+    expect(rows[0].querySelector('.recent-dir').textContent).toBe('/home/me/music')
+  })
+
+  it('opens a recent file when it is clicked', async () => {
+    withRecent()
+    await bootApp()
+    await vi.waitFor(() => expect(document.querySelector('.recent-open')).not.toBeNull())
+
+    document.querySelector('.recent-open').click()
+
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('load_audio', { path: '/home/me/music/a.wav', points: 900 }),
+    )
+  })
+
+  it('removes one entry, or all of them', async () => {
+    withRecent()
+    await bootApp()
+    await vi.waitFor(() => expect(document.querySelectorAll('.recent-item').length).toBe(2))
+
+    document.querySelector('.recent-remove').click()
+    await vi.waitFor(() => expect(document.querySelectorAll('.recent-item').length).toBe(1))
+    expect(invoke).toHaveBeenCalledWith('forget_recent', { path: '/home/me/music/a.wav' })
+
+    $('recent-clear').click()
+    await vi.waitFor(() => expect($('recent').classList.contains('hidden')).toBe(true))
+    expect(invoke).toHaveBeenCalledWith('forget_recent', { path: null })
+  })
+
+  it('redraws the list when the menu clears it', async () => {
+    withRecent()
+    await bootApp()
+    await vi.waitFor(() => expect(document.querySelectorAll('.recent-item').length).toBe(2))
+
+    await invoke('forget_recent', { path: null })
+    menuHandlers['recent-changed']()
+    await vi.waitFor(() => expect($('recent').classList.contains('hidden')).toBe(true))
+  })
+
+  it('keeps working when the recent files cannot be read', async () => {
+    invoke.mockImplementation((cmd) =>
+      cmd === 'get_recent' ? Promise.reject(new Error('boom')) : Promise.resolve(undefined),
+    )
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await bootApp()
+
+    await vi.waitFor(() => expect(console.warn).toHaveBeenCalled())
+    expect($('recent').classList.contains('hidden')).toBe(true)
+  })
+})
+
+describe('main — undo and redo', () => {
+  const undoRedoCalls = () => invoke.mock.calls.filter(([c]) => c === 'set_undo_redo').map(([, a]) => a)
+  const lastState = () => undoRedoCalls().at(-1)
+  const preset = (v) => document.querySelector(`.preset[data-v="${v}"]`)
+
+  it('starts with nothing to undo once a file is open', async () => {
+    await bootApp()
+    await loadAudio()
+    expect(lastState()).toEqual({ canUndo: false, canRedo: false })
+  })
+
+  it('takes a step per edit and undoes it from the menu', async () => {
+    await bootApp()
+    await loadAudio()
+
+    preset('2.0').click()
+    expect($('speed').value).toBe('6') // the slider steps through the presets: 2x is the 7th
+    expect(lastState()).toEqual({ canUndo: true, canRedo: false })
+
+    menuHandlers['menu-undo']()
+    expect($('speed').value).toBe('3')
+    expect(lastState()).toEqual({ canUndo: false, canRedo: true })
+
+    menuHandlers['menu-redo']()
+    expect($('speed').value).toBe('6')
+    expect(lastState()).toEqual({ canUndo: true, canRedo: false })
+  })
+
+  it('records a slider or field once it is released, and restores several controls', async () => {
+    await bootApp()
+    await loadAudio()
+
+    $('fadein').value = '3'
+    $('fadein').dispatchEvent(new Event('input', { bubbles: true }))
+    $('fadein').dispatchEvent(new Event('change', { bubbles: true }))
+    $('normalize').checked = true
+    $('normalize').dispatchEvent(new Event('change', { bubbles: true }))
+
+    menuHandlers['menu-undo']()
+    expect($('normalize').checked).toBe(false)
+    expect($('fadein').value).toBe('3')
+    menuHandlers['menu-undo']()
+    expect($('fadein').value).toBe('0')
+    expect($('fadein-val').textContent).toBe('0.0s')
+  })
+
+  it('drops the steps that were undone when a new edit is made', async () => {
+    await bootApp()
+    await loadAudio()
+    preset('2.0').click()
+    menuHandlers['menu-undo']()
+
+    preset('0.5').click()
+
+    expect(lastState()).toEqual({ canUndo: true, canRedo: false })
+    menuHandlers['menu-redo']()
+    expect($('speed').value).toBe('1')
+  })
+
+  it('ignores a click that changes nothing, and undo/redo at the ends', async () => {
+    await bootApp()
+    await loadAudio()
+    preset('1.0').click()
+    menuHandlers['menu-undo']()
+    menuHandlers['menu-redo']()
+    expect(lastState()).toEqual({ canUndo: false, canRedo: false })
+  })
+
+  it('starts the history again when another file is opened', async () => {
+    await bootApp()
+    await loadAudio()
+    preset('2.0').click()
+
+    open.mockResolvedValue('/home/me/other.wav')
+    $('open-btn-header').click()
+
+    await vi.waitFor(() => expect(lastState()).toEqual({ canUndo: false, canRedo: false }))
+  })
+
+  it('leaves undo to the typing while a number field has the focus', async () => {
+    const exec = vi.fn(() => true)
+    document.execCommand = exec
+    await bootApp()
+    await loadAudio()
+    preset('2.0').click()
+    $('cut-start').focus()
+
+    menuHandlers['menu-undo']()
+
+    expect(exec).toHaveBeenCalledWith('undo')
+    expect($('speed').value).toBe('6')
+  })
+})
+
+describe('main — theme', () => {
+  it('marks the page with the chosen theme, and leaves "system" to the system', async () => {
+    await bootApp()
+
+    await menuHandlers['menu-set-theme']({ payload: 'light' })
+    expect(document.documentElement.dataset.theme).toBe('light')
+
+    await menuHandlers['menu-set-theme']({ payload: 'dark' })
+    expect(document.documentElement.dataset.theme).toBe('dark')
+
+    await menuHandlers['menu-set-theme']({ payload: 'system' })
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+  })
+
+  it('applies the saved theme before anything is drawn', async () => {
+    localStorage.setItem('lcs-theme', 'light')
+
+    await bootApp()
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
+  it('repaints the waveform and the visualisation in the new colours', async () => {
+    await bootApp()
+    await loadAudio()
+    ctx2d.drawImage.mockClear()
+
+    await menuHandlers['menu-set-theme']({ payload: 'light' })
+
+    expect(ctx2d.drawImage).toHaveBeenCalled()
+  })
+
+  it('applies the saved theme at startup, system by default', async () => {
+    await bootApp()
+    expect(invoke).toHaveBeenCalledWith('set_theme', { theme: 'system' })
+
+    localStorage.setItem('lcs-theme', 'dark')
+    await bootApp()
+    expect(invoke).toHaveBeenCalledWith('set_theme', { theme: 'dark' })
+  })
+
+  it('applies and remembers the theme chosen in the menu', async () => {
+    await bootApp()
+
+    await menuHandlers['menu-set-theme']({ payload: 'light' })
+
+    expect(invoke).toHaveBeenCalledWith('set_theme', { theme: 'light' })
+    expect(localStorage.getItem('lcs-theme')).toBe('light')
   })
 })
 
@@ -391,12 +677,13 @@ describe('main — format and speed controls', () => {
 
   it('moves the speed slider to the chosen preset', async () => {
     await bootApp()
-    const preset = document.querySelector('.preset[data-v="2"]') ?? document.querySelectorAll('.preset')[1]
+    const preset = document.querySelector('.preset[data-v="2.0"]')
 
     preset.click()
 
     expect(preset.classList.contains('active')).toBe(true)
-    expect(parseFloat($('speed').value)).toBe(parseFloat(preset.dataset.v))
+    expect($('speed').value).toBe('6')
+    expect($('speed-val').textContent).toBe('2x')
   })
 })
 
@@ -475,32 +762,31 @@ describe('main — waveform rendering', () => {
     expect(ctx2d.setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0)
   })
 
-  it('greys out what falls outside the trim range', async () => {
+  it('draws the whole file in colour: the cuts are drawn over it, not in it', async () => {
     await bootApp()
     await loadAudio()
     ctx2d.fillRect.mockClear()
     const colours = []
     ctx2d.fillRect.mockImplementation(() => colours.push(ctx2d.fillStyle))
 
-    $('trim-enabled').checked = true
-    $('trim-start').value = '5'
-    $('trim-end').value = '6'
-    $('trim-enabled').dispatchEvent(new Event('change'))
+    cutBetween(5, 6)
 
-    expect(colours).toContain('#7c3aed') // inside the selection
-    expect(colours).toContain('#24243e') // outside the selection
+    expect(colours).not.toContain('#242424')
+    expect(document.querySelectorAll('.tl-cut')).toHaveLength(1)
   })
 
-  it('draws a handle at each end of the trim range', async () => {
+  it('draws the playhead where the sound is in the file, not in what is left', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    ctx2d.arcTo.mockClear()
+    cutBetween(0, 5)
+    ctx2d.moveTo.mockClear()
 
-    $('trim-start').dispatchEvent(new Event('input'))
+    $('play-btn').click()
+    audio.ctx.currentTime = 1 // 1 s into what is left: 6 s into the file
+    runFrame()
 
-    // Each tab is rounded at its two bottom corners, with no `roundRect`.
-    expect(ctx2d.arcTo).toHaveBeenCalledTimes(4)
+    const x = xForTime(6)
+    expect(ctx2d.moveTo.mock.calls.some(([px]) => Math.abs(px - x) < 0.5)).toBe(true)
   })
 
   it('redraws on window resize', async () => {
@@ -558,7 +844,7 @@ describe('main — playback', () => {
     await bootApp()
     await loadAudio()
 
-    $('trim-start').dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }))
+    $('cut-start').dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }))
 
     expect($('play-icon').innerHTML).toContain('polygon')
   })
@@ -594,20 +880,19 @@ describe('main — playback', () => {
     expect($('time-current').textContent).toBe('0:06')
   })
 
-  it('starts from the trim start when the playhead sits outside the range', async () => {
+  it('plays what the cuts leave, as one piece', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '4'
-    $('trim-end').value = '8'
+    cutBetween(4, 8)
 
     $('play-btn').click()
 
-    // The end of the range is scheduled on the audio clock: 4 s to play.
-    expect(lastSource().start).toHaveBeenCalledWith(0, 4, 4)
+    expect(lastSource().start).toHaveBeenCalledWith(0, 0)
+    expect(lastSource().buffer.duration).toBeCloseTo(8.5, 2) // 12.5 s minus 4 s
+    expect($('time-total').textContent).toBe('0:08')
   })
 
-  it('plays the whole file, with no duration, when trim is off', async () => {
+  it('plays the whole file, as it is, when nothing is cut', async () => {
     await bootApp()
     await loadAudio()
 
@@ -616,12 +901,10 @@ describe('main — playback', () => {
     expect(lastSource().start.mock.calls[0]).toEqual([0, 0])
   })
 
-  it('stops at the trim end by itself and rewinds to the trim start', async () => {
+  it('rewinds to the start of what is left when the source ends on its own', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '1'
-    $('trim-end').value = '2'
+    cutBetween(1, 2)
     $('play-btn').click()
     const source = lastSource()
 
@@ -630,22 +913,20 @@ describe('main — playback', () => {
 
     expect($('play-icon').innerHTML).toContain('polygon')
     $('play-btn').click()
-    expect(lastSource().start).toHaveBeenCalledWith(0, 1, 1)
+    expect(lastSource().start).toHaveBeenCalledWith(0, 0)
   })
 
-  it('keeps the playhead inside the trim range even if no frame ran', async () => {
+  it('keeps the playhead inside what is left even if no frame ran', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '1'
-    $('trim-end').value = '2'
+    cutBetween(2, 12.5)
     $('play-btn').click()
 
     audio.ctx.currentTime = 50 // a hidden window: no frame, the clock moves on
     $('play-btn').click() // pause
 
     $('play-btn').click()
-    expect(lastSource().start).toHaveBeenCalledWith(0, 1, 1)
+    expect(lastSource().start).toHaveBeenCalledWith(0, 0)
   })
 
   it('rewinds to the beginning when the source ends on its own', async () => {
@@ -676,12 +957,11 @@ describe('main — playback', () => {
     expect(last).toEqual([0, 12.5]) // silent at the end of the file
   })
 
-  it('schedules the fades relative to the trimmed region', async () => {
+  it('schedules the fades relative to what the cuts leave', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '2'
-    $('trim-end').value = '10'
+    cutBetween(0, 2)
+    cutBetween(10, 12.5)
     $('fadein').value = '1'
 
     $('play-btn').click()
@@ -694,9 +974,7 @@ describe('main — playback', () => {
   it('multiplies two overlapping fades instead of taking the smaller', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '0'
-    $('trim-end').value = '1'
+    cutBetween(1, 12.5)
     $('fadein').value = '0.8'
     $('fadeout').value = '0.8'
 
@@ -735,21 +1013,17 @@ describe('main — playback', () => {
     expect(fadeNode().gain.setValueAtTime).toHaveBeenCalled()
   })
 
-  it('restarts from where it is when the trim end moves during playback', async () => {
+  it('restarts from where it is when a cut is made during playback', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '1'
-    $('trim-end').value = '9'
     $('play-btn').click()
     const first = lastSource()
 
-    $('trim-end').value = '5'
-    $('trim-end').dispatchEvent(new Event('input'))
+    cutBetween(5, 9)
 
     expect(first.stop).toHaveBeenCalled()
     expect(lastSource()).not.toBe(first)
-    expect(lastSource().start).toHaveBeenCalledWith(0, 1, 4)
+    expect(lastSource().start).toHaveBeenCalledWith(0, 0)
   })
 })
 
@@ -765,16 +1039,15 @@ describe('main — preview settings', () => {
     await vi.waitFor(() => expect(normalizeNode().gain.value).toBeCloseTo(0.8912509 / 0.9, 5))
   })
 
-  it('measures the peak of the trimmed region only', async () => {
+  it('measures the peak of what the cuts leave only', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
     // Buckets 0-89 (0 s – 1.25 s) only reach 0.9 at their 10th element: take a
     // stretch whose loudest bucket is 0.5.
     const duration = AUDIO_INFO.duration
     const bucket = (i) => (i / AUDIO_INFO.waveform.length) * duration
-    $('trim-start').value = String(bucket(10) + 0.001)
-    $('trim-end').value = String(bucket(15) - 0.001)
+    cutBetween(0, bucket(10) + 0.001)
+    cutBetween(bucket(15) - 0.001, duration)
 
     $('normalize').checked = true
     $('normalize').dispatchEvent(new Event('change'))
@@ -827,9 +1100,8 @@ describe('main — preview settings', () => {
     vi.stubGlobal('OfflineAudioContext', OfflineAudioContext)
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '2'
-    $('trim-end').value = '4'
+    cutBetween(0, 2)
+    cutBetween(4, 12.5)
     $('filter-type').value = 'lowpass'
 
     $('normalize').checked = true
@@ -862,7 +1134,7 @@ describe('main — preview settings', () => {
     warn.mockRestore()
   })
 
-  it('re-measures, debounced, when the trim changes with normalise on', async () => {
+  it('re-measures, debounced, when the cuts change with normalise on', async () => {
     await bootApp()
     await loadAudio()
     $('normalize').checked = true
@@ -870,11 +1142,8 @@ describe('main — preview settings', () => {
     await vi.waitFor(() => expect(normalizeNode().gain.value).not.toBe(1))
     vi.useFakeTimers()
 
-    $('trim-enabled').checked = true
-    $('trim-start').value = '0'
-    $('trim-end').value = '0.1'
-    $('trim-end').dispatchEvent(new Event('input'))
-    $('trim-end').dispatchEvent(new Event('input'))
+    cutBetween(1.08, 12.5)
+    cutBetween(0, 1) // what is left, 1.0–1.08 s, peaks lower than the whole file
     const before = normalizeNode().gain.value
     await vi.advanceTimersByTimeAsync(200)
     vi.useRealTimers()
@@ -991,124 +1260,603 @@ describe('main — slider labels', () => {
     expect($('fadeout-val').textContent).toBe('1.2s')
   })
 
-  it('shows the speed and deselects the presets when off the grid', async () => {
+  it('shows the speed as the presets do, and steps through them', async () => {
     await bootApp()
 
-    $('speed').value = '1.25'
+    $('speed').value = '4'
     $('speed').dispatchEvent(new Event('input'))
 
-    expect($('speed-val').textContent).toBe('1.25×')
-    expect(document.querySelectorAll('.preset.active')).toHaveLength(0)
+    expect($('speed-val').textContent).toBe('1.25x')
+    expect(document.querySelector('.preset[data-v="1.25"]').classList.contains('active')).toBe(true)
+    expect(document.querySelectorAll('.preset.active')).toHaveLength(1)
   })
 
   it('reselects the matching preset', async () => {
     await bootApp()
 
-    $('speed').value = '2.0'
+    $('speed').value = '6'
     $('speed').dispatchEvent(new Event('input'))
 
     expect(document.querySelector('.preset[data-v="2.0"]').classList.contains('active')).toBe(true)
   })
 })
 
-describe('main — trim handles', () => {
-  const mouse = (type, clientX, target = $('waveform')) =>
-    target.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true, cancelable: true }))
+describe('main — filter buttons', () => {
+  const button = (type) => document.querySelector(`.stab-btn[data-for="filter-type"][data-value="${type}"]`)
 
-  async function withTrim() {
+  it('choose the filter type, as the select does', async () => {
+    await bootApp()
+    expect(button('').classList.contains('active')).toBe(true)
+
+    button('bandpass').click()
+
+    expect($('filter-type').value).toBe('bandpass')
+    expect($('filter-params').classList.contains('hidden')).toBe(false)
+    expect(button('bandpass').classList.contains('active')).toBe(true)
+    expect(button('bandpass').getAttribute('aria-pressed')).toBe('true')
+    expect(button('').getAttribute('aria-pressed')).toBe('false')
+    expect(document.querySelectorAll('.stab-btn[data-for="filter-type"].active')).toHaveLength(1)
+  })
+
+  it('follow the type when something else sets it, undo for one', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-start').value = '2'
-    $('trim-end').value = '10'
-    return $('waveform')
+    button('lowpass').click()
+    expect(button('lowpass').classList.contains('active')).toBe(true)
+
+    $('undo-btn').click()
+
+    expect($('filter-type').value).toBe('')
+    expect(button('').classList.contains('active')).toBe(true)
+    expect(button('lowpass').classList.contains('active')).toBe(false)
+  })
+
+  it('are named in French when the interface is French', async () => {
+    await bootApp()
+
+    await menuHandlers['menu-set-language']({ payload: 'fr' })
+
+    expect([...document.querySelectorAll('.stab-btn[data-for="filter-type"]')].map((b) => b.textContent)).toEqual([
+      'Aucun', 'Passe-bas', 'Passe-haut', 'Passe-bande',
+    ])
+  })
+})
+
+describe('main — fade curve buttons', () => {
+  const button = (value) => document.querySelector(`.stab-btn[data-for="fade-curve"][data-value="${value}"]`)
+
+  it('choose the curve, as the select does', async () => {
+    await bootApp()
+    expect(button('linear').classList.contains('active')).toBe(true)
+
+    button('equal-power').click()
+
+    expect($('fade-curve').value).toBe('equal-power')
+    expect(button('equal-power').classList.contains('active')).toBe(true)
+    expect(button('equal-power').getAttribute('aria-pressed')).toBe('true')
+    expect(button('linear').getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('follow the curve when undo sets it back', async () => {
+    await bootApp()
+    await loadAudio()
+    button('equal-power').click()
+
+    $('undo-btn').click()
+
+    expect($('fade-curve').value).toBe('linear')
+    expect(button('linear').classList.contains('active')).toBe(true)
+    expect(button('equal-power').classList.contains('active')).toBe(false)
+  })
+
+  it('are named in French when the interface is French', async () => {
+    await bootApp()
+
+    await menuHandlers['menu-set-language']({ payload: 'fr' })
+
+    expect([button('linear'), button('equal-power')].map((b) => b.textContent)).toEqual(['Linéaire', 'Puissance égale'])
+  })
+})
+
+describe('main — cuts', () => {
+  const cutEls = () => [...document.querySelectorAll('.tl-cut:not(.tl-cut-draft)')]
+  const widthOf = (el) => parseFloat(el.style.width)
+  const leftOf = (el) => parseFloat(el.style.left)
+
+  async function ready() {
+    await bootApp()
+    await loadAudio()
   }
 
-  it('flags the handle under the cursor', async () => {
-    const canvas = await withTrim()
+  it('makes a cut by dragging over the track', async () => {
+    await ready()
 
-    mouse('mousemove', xForTime(2))
-    expect(canvas.classList.contains('cursor-resize')).toBe(true)
+    cutBetween(4, 8)
 
-    mouse('mousemove', xForTime(6))
-    expect(canvas.classList.contains('cursor-resize')).toBe(false)
+    expect(cutEls()).toHaveLength(1)
+    expect(leftOf(cutEls()[0])).toBeCloseTo((4 / 12.5) * 100, 1)
+    expect(widthOf(cutEls()[0])).toBeCloseTo((4 / 12.5) * 100, 1)
+    expect($('cut-count').textContent).toBe('1 cut')
+    expect($('cut-count').classList.contains('hidden')).toBe(false)
+    expect($('time-total').textContent).toBe('0:08')
   })
 
-  it('clears the cursor when leaving the canvas', async () => {
-    const canvas = await withTrim()
-    mouse('mousemove', xForTime(2))
+  it('says in the sidebar how to cut, and how many cuts there are', async () => {
+    await ready()
+    expect($('side-cut-count').classList.contains('hidden')).toBe(true)
+    expect(document.querySelector('.side-hint').textContent).toContain('drag to select')
 
-    canvas.dispatchEvent(new MouseEvent('mouseleave'))
+    cutBetween(1, 2)
+    cutBetween(5, 6)
 
-    expect(canvas.classList.contains('cursor-resize')).toBe(false)
+    expect($('side-cut-count').textContent).toBe('2 cuts')
+    expect($('side-cut-count').classList.contains('hidden')).toBe(false)
   })
 
-  it('offers no handle when trim is off', async () => {
-    await bootApp()
-    await loadAudio()
-    const canvas = $('waveform')
+  it('shows the zone being drawn before the pointer is released', async () => {
+    await ready()
 
-    mouse('mousemove', xForTime(0))
+    pointer('pointerdown', xForTime(4))
+    pointer('pointermove', xForTime(8))
 
-    expect(canvas.classList.contains('cursor-resize')).toBe(false)
+    expect(document.querySelectorAll('.tl-cut-draft')).toHaveLength(1)
+    expect(cutEls()).toHaveLength(0)
+    pointer('pointerup', xForTime(8))
+    expect(document.querySelectorAll('.tl-cut-draft')).toHaveLength(0)
   })
 
-  it('moves the start handle', async () => {
-    await withTrim()
+  it('counts the cuts, in the plural too', async () => {
+    await ready()
 
-    mouse('mousedown', xForTime(2))
-    mouse('mousemove', xForTime(5), window)
-    mouse('mouseup', 0, window)
+    cutBetween(1, 2)
+    cutBetween(5, 6)
 
-    expect(parseFloat($('trim-start').value)).toBeCloseTo(5, 1)
-    expect($('waveform').classList.contains('cursor-resize')).toBe(false)
+    expect($('cut-count').textContent).toBe('2 cuts')
   })
 
-  it('moves the end handle', async () => {
-    await withTrim()
+  it('moves the playhead on a press without a drag', async () => {
+    await ready()
 
-    mouse('mousedown', xForTime(10))
-    mouse('mousemove', xForTime(7), window)
-    mouse('mouseup', 0, window)
-
-    expect(parseFloat($('trim-end').value)).toBeCloseTo(7, 1)
-  })
-
-  it('keeps the handles from crossing', async () => {
-    await withTrim()
-
-    mouse('mousedown', xForTime(2))
-    mouse('mousemove', xForTime(12), window) // past the end
-    mouse('mouseup', 0, window)
-
-    expect(parseFloat($('trim-start').value)).toBeCloseTo(9.9, 2)
-  })
-
-  it('ignores moves when no drag is under way', async () => {
-    await withTrim()
-
-    mouse('mousemove', xForTime(5), window)
-
-    expect($('trim-start').value).toBe('2')
-  })
-
-  it('moves the playhead on a click away from the handles', async () => {
-    await withTrim()
-
-    mouse('mousedown', xForTime(6))
+    pointer('pointerdown', xForTime(6))
+    pointer('pointerup', xForTime(6))
 
     expect($('time-current').textContent).toBe('0:06')
+    expect(cutEls()).toHaveLength(0)
   })
 
   it('resumes playback at the new point when it was playing', async () => {
-    await withTrim()
+    await ready()
     $('play-btn').click()
 
-    mouse('mousedown', xForTime(6))
+    pointer('pointerdown', xForTime(6))
+    pointer('pointerup', xForTime(6))
 
-    // Trim is on, so the end of the range comes along: 10 s − 6 s.
-    expect(lastSource().start).toHaveBeenLastCalledWith(0, expect.closeTo(6, 1), expect.closeTo(4, 1))
+    expect(lastSource().start).toHaveBeenLastCalledWith(0, expect.closeTo(6, 1))
     expect($('play-icon').innerHTML).toContain('rect')
+  })
+
+  it('puts the playhead at the start of a cut when it is pressed inside one', async () => {
+    await ready()
+    cutBetween(2, 8)
+
+    pointer('pointerdown', xForTime(1))
+    pointer('pointerup', xForTime(1))
+    expect($('time-current').textContent).toBe('0:01')
+
+    // Counted along what is left: after 2 s, the next sound is at 8 s in the file.
+    pointer('pointerdown', xForTime(9))
+    pointer('pointerup', xForTime(9))
+    expect($('time-current').textContent).toBe('0:03')
+  })
+
+  it('does not make a cut out of a drag that is too short', async () => {
+    await ready()
+
+    cutBetween(4, 4.02)
+
+    expect(cutEls()).toHaveLength(0)
+  })
+
+  it('drags the left edge to resize a cut', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    pointer('pointerdown', xForTime(4))
+    pointer('pointermove', xForTime(3))
+    pointer('pointerup', xForTime(3))
+
+    expect(leftOf(cutEls()[0])).toBeCloseTo((3 / 12.5) * 100, 1)
+    expect($('time-total').textContent).toBe('0:07')
+  })
+
+  it('drags the right edge to resize a cut', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    pointer('pointerdown', xForTime(8))
+    pointer('pointermove', xForTime(10))
+    pointer('pointerup', xForTime(10))
+
+    expect(widthOf(cutEls()[0])).toBeCloseTo((6 / 12.5) * 100, 1)
+  })
+
+  it('keeps the edges of a cut apart', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    pointer('pointerdown', xForTime(4))
+    pointer('pointermove', xForTime(11)) // past the other edge
+    pointer('pointerup', xForTime(11))
+
+    const [cut] = cutEls()
+    expect(widthOf(cut)).toBeGreaterThan(0)
+    expect(leftOf(cut) + widthOf(cut)).toBeCloseTo((8 / 12.5) * 100, 1)
+  })
+
+  it('drags the middle of a cut to move it', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    pointer('pointerdown', xForTime(6))
+    pointer('pointermove', xForTime(8))
+    pointer('pointerup', xForTime(8))
+
+    expect(leftOf(cutEls()[0])).toBeCloseTo((6 / 12.5) * 100, 1)
+    expect(widthOf(cutEls()[0])).toBeCloseTo((4 / 12.5) * 100, 1)
+  })
+
+  it('keeps a moved cut inside the file', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    pointer('pointerdown', xForTime(6))
+    pointer('pointermove', xForTime(30))
+    pointer('pointerup', xForTime(30))
+
+    expect(leftOf(cutEls()[0]) + widthOf(cutEls()[0])).toBeCloseTo(100, 1)
+  })
+
+  it('merges a cut that overlaps another', async () => {
+    await ready()
+    cutBetween(2, 6)
+
+    cutBetween(1, 4) // starts clear of the first one's edge
+
+    expect(cutEls()).toHaveLength(1)
+    expect(widthOf(cutEls()[0])).toBeCloseTo((5 / 12.5) * 100, 1)
+  })
+
+  it('merges a cut that is dragged over another', async () => {
+    await ready()
+    cutBetween(1, 3)
+    cutBetween(6, 8)
+
+    pointer('pointerdown', xForTime(7))
+    pointer('pointermove', xForTime(3))
+    pointer('pointerup', xForTime(3))
+
+    expect(cutEls()).toHaveLength(1)
+  })
+
+  it('removes a cut with its ×', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    document.querySelector('.tl-cut-delete').click()
+
+    expect(cutEls()).toHaveLength(0)
+    expect($('time-total').textContent).toBe('0:12')
+    expect($('cut-count').classList.contains('hidden')).toBe(true)
+  })
+
+  it('removes the selected cut with the Delete key, unless typing', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    $('cut-start').dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
+    expect(cutEls()).toHaveLength(1)
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }))
+    expect(cutEls()).toHaveLength(0)
+  })
+
+  it('clears every cut at once', async () => {
+    await ready()
+    cutBetween(1, 2)
+    cutBetween(5, 6)
+
+    $('cut-clear').click()
+
+    expect(cutEls()).toHaveLength(0)
+    expect($('cut-clear').classList.contains('hidden')).toBe(true)
+  })
+
+  it('edits the selected cut by its times', async () => {
+    await ready()
+    expect($('cut-fields').classList.contains('hidden')).toBe(true)
+    expect($('cut-placeholder').classList.contains('hidden')).toBe(false)
+
+    cutBetween(4, 8)
+
+    expect($('cut-fields').classList.contains('hidden')).toBe(false)
+    expect($('cut-start').value).toBe('0:04.0')
+    expect($('cut-end').value).toBe('0:08.0')
+    expect($('cut-length').textContent).toBe('(0:04.0)')
+
+    $('cut-end').value = '0:10.5'
+    $('cut-end').dispatchEvent(new Event('blur'))
+
+    expect(widthOf(cutEls()[0])).toBeCloseTo((6.5 / 12.5) * 100, 1)
+  })
+
+  it('refuses a time that is not one, and puts the old one back', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    $('cut-start').value = 'soon'
+    $('cut-start').dispatchEvent(new Event('blur'))
+
+    expect($('cut-start').value).toBe('0:04.0')
+    expect(leftOf(cutEls()[0])).toBeCloseTo((4 / 12.5) * 100, 1)
+  })
+
+  it('does not count leaving a field untouched as an edit', async () => {
+    await ready()
+    cutBetween(4, 8)
+    const steps = invoke.mock.calls.filter(([cmd]) => cmd === 'set_undo_redo').length
+
+    $('cut-start').dispatchEvent(new Event('blur'))
+
+    expect(invoke.mock.calls.filter(([cmd]) => cmd === 'set_undo_redo').length).toBe(steps)
+  })
+
+  it('does not let a typed time leave the file or cross the other edge', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    $('cut-end').value = '5:00'
+    $('cut-end').dispatchEvent(new Event('blur'))
+    expect(leftOf(cutEls()[0]) + widthOf(cutEls()[0])).toBeCloseTo(100, 1)
+
+    $('cut-start').value = '5:00'
+    $('cut-start').dispatchEvent(new Event('blur'))
+    expect(widthOf(cutEls()[0])).toBeGreaterThan(0)
+  })
+
+  it('builds what plays from the file without the cuts', async () => {
+    await ready()
+
+    cutBetween(0, 5)
+
+    const built = audio.builtBuffers.at(-1)
+    expect(built.duration).toBeCloseTo(7.5, 3)
+    expect(built.getChannelData(0)[0]).toBe(0.5)
+    expect(built.getChannelData(0)).toHaveLength(Math.round(7.5 * 44100))
+  })
+
+  it('plays the file itself when nothing is cut', async () => {
+    await ready()
+    cutBetween(0, 5)
+    $('cut-clear').click()
+
+    $('play-btn').click()
+
+    expect(lastSource().buffer).toBe(audio.lastBuffer)
+  })
+
+  it('goes back to the whole file with undo, and forward again with redo', async () => {
+    await ready()
+    cutBetween(4, 8)
+    expect($('undo-btn').disabled).toBe(false)
+
+    $('undo-btn').click()
+    expect(cutEls()).toHaveLength(0)
+    expect($('time-total').textContent).toBe('0:12')
+
+    $('redo-btn').click()
+    expect(cutEls()).toHaveLength(1)
+    expect($('time-total').textContent).toBe('0:08')
+  })
+
+  it('makes a cut with the keys I and O at the playhead', async () => {
+    await ready()
+    const key = (k) => $('waveform').dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }))
+
+    $('seekbar').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))
+    key('i') // 5 s
+    $('seekbar').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true }))
+    key('o') // 10 s
+
+    expect(cutEls()).toHaveLength(1)
+    expect(leftOf(cutEls()[0])).toBeCloseTo((5 / 12.5) * 100, 1)
+    expect(widthOf(cutEls()[0])).toBeCloseTo((5 / 12.5) * 100, 1)
+  })
+
+  it('ignores O without an I, and a cut that would be too short', async () => {
+    await ready()
+    const key = (k) => $('waveform').dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }))
+
+    key('o')
+    key('i')
+    key('o')
+
+    expect(cutEls()).toHaveLength(0)
+  })
+
+  it('moves the playhead with the arrow keys on the waveform', async () => {
+    await ready()
+
+    $('waveform').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    $('waveform').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+
+    expect($('time-current').textContent).toBe('0:02')
+  })
+
+  it('labels the handles and the delete button in the current language', async () => {
+    await ready()
+    cutBetween(4, 8)
+    expect(document.querySelector('.tl-cut-handle').title).toBe('Drag to resize')
+
+    await menuHandlers['menu-set-language']({ payload: 'fr' })
+
+    expect(document.querySelector('.tl-cut-handle').title).toBe('Glisser pour redimensionner')
+    expect($('cut-count').textContent).toBe('1 coupe')
+  })
+
+  it('starts again without cuts when another file is opened', async () => {
+    await ready()
+    cutBetween(4, 8)
+
+    await loadAudio('/home/me/other.wav')
+    await vi.waitFor(() => expect($('badge-name').textContent).toBe('other.wav'))
+
+    expect(cutEls()).toHaveLength(0)
+    expect($('time-total').textContent).toBe('0:12')
+  })
+
+  it('ignores a press that is not the main button', async () => {
+    await ready()
+
+    $('tl-track').dispatchEvent(new MouseEvent('pointerdown', { clientX: xForTime(4), bubbles: true, button: 2 }))
+    pointer('pointermove', xForTime(8))
+    pointer('pointerup', xForTime(8))
+
+    expect(cutEls()).toHaveLength(0)
+  })
+
+  it('stops a drag that the system cancels', async () => {
+    await ready()
+
+    pointer('pointerdown', xForTime(4))
+    pointer('pointermove', xForTime(8))
+    pointer('pointercancel', xForTime(8))
+
+    expect(document.querySelectorAll('.tl-cut-draft')).toHaveLength(0)
+    expect(cutEls()).toHaveLength(0)
+  })
+})
+
+describe('main — seek bar', () => {
+  async function ready() {
+    await bootApp()
+    await loadAudio()
+  }
+  const seekbarX = (t) => (t / 12.5) * CANVAS_W
+
+  it('moves the playhead where it is pressed, and follows a drag', async () => {
+    await ready()
+
+    pointer('pointerdown', seekbarX(5), $('seekbar'))
+    expect($('time-current').textContent).toBe('0:05')
+    pointer('pointermove', seekbarX(9), $('seekbar'))
+    expect($('time-current').textContent).toBe('0:09')
+    pointer('pointerup', seekbarX(9), $('seekbar'))
+    pointer('pointermove', seekbarX(2), $('seekbar'))
+
+    expect($('time-current').textContent).toBe('0:09')
+  })
+
+  it('fills up with the playhead', async () => {
+    await ready()
+
+    pointer('pointerdown', seekbarX(5), $('seekbar'))
+
+    expect(parseFloat($('seekbar-fill').style.width)).toBeCloseTo(40, 1)
+    expect(parseFloat($('seekbar-thumb').style.left)).toBeCloseTo(40, 1)
+    expect($('seekbar').getAttribute('aria-valuenow')).toBe('5')
+  })
+
+  it('counts along what the cuts leave', async () => {
+    await ready()
+    cutBetween(0, 5)
+
+    pointer('pointerdown', CANVAS_W, $('seekbar')) // the end of what is left: 7.5 s
+
+    expect($('time-current').textContent).toBe('0:07')
+    expect(parseFloat($('seekbar-fill').style.width)).toBeCloseTo(100, 0)
+  })
+
+  it('names the time under the pointer', async () => {
+    await ready()
+
+    pointer('pointermove', seekbarX(3), $('seekbar'))
+
+    expect($('seekbar-tooltip').textContent).toBe('0:03')
+    expect($('seekbar').classList.contains('hover')).toBe(true)
+    $('seekbar').dispatchEvent(new MouseEvent('pointerleave'))
+    expect($('seekbar').classList.contains('hover')).toBe(false)
+  })
+
+  it('moves with the arrow keys', async () => {
+    await ready()
+
+    $('seekbar').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
+    $('seekbar').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true, cancelable: true }))
+    $('seekbar').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+
+    expect($('time-current').textContent).toBe('0:05')
+  })
+
+  it('does nothing before a file is open', async () => {
+    await bootApp()
+
+    pointer('pointerdown', seekbarX(5), $('seekbar'))
+
+    expect($('time-current').textContent).toBe('0:00')
+  })
+})
+
+describe('main — visualisation', () => {
+  async function ready() {
+    await bootApp()
+    await loadAudio()
+  }
+
+  it('listens to the sound on its way to the output', async () => {
+    await ready()
+
+    const [analyser] = audio.analysers
+    expect(analyser.fftSize).toBe(512)
+    expect(normalizeNode().connect).toHaveBeenCalledWith(analyser)
+    expect(normalizeNode().connect).toHaveBeenCalledWith(audio.ctx.destination)
+  })
+
+  it('draws the frequency bars while playing', async () => {
+    await ready()
+    $('play-btn').click()
+    ctx2d.fillRect.mockClear()
+
+    runFrame()
+
+    expect(audio.analysers[0].getByteFrequencyData).toHaveBeenCalled()
+    expect(ctx2d.fillRect).toHaveBeenCalled()
+  })
+
+  it('draws a quiet line of short bars when nothing plays', async () => {
+    await ready()
+    ctx2d.fillRect.mockClear()
+
+    pointer('pointerdown', 100, $('seekbar'))
+
+    expect(audio.analysers[0].getByteFrequencyData).not.toHaveBeenCalled()
+    expect(ctx2d.fillRect).toHaveBeenCalled()
+  })
+
+  it('still plays where the WebView has no analyser', async () => {
+    const Original = globalThis.AudioContext
+    vi.stubGlobal(
+      'AudioContext',
+      class extends Original {
+        createAnalyser = undefined
+      },
+    )
+    await ready()
+
+    $('play-btn').click()
+    audio.ctx.currentTime = 1
+    runFrame()
+
+    expect($('time-current').textContent).toBe('0:01')
   })
 })
 
@@ -1237,7 +1985,7 @@ describe('language', () => {
   it('starts in English until a choice has been made', async () => {
     await bootApp()
 
-    expect($('open-btn').textContent).toBe('Open a file')
+    expect($('open-btn').textContent).toBe('Browse files')
     expect(document.documentElement.lang).toBe('en')
   })
 
@@ -1246,7 +1994,7 @@ describe('language', () => {
 
     await bootApp()
 
-    expect($('open-btn').textContent).toBe('Ouvrir un fichier')
+    expect($('open-btn').textContent).toBe('Parcourir les fichiers')
     expect(document.documentElement.lang).toBe('fr')
   })
 
@@ -1255,9 +2003,9 @@ describe('language', () => {
 
     await menuHandlers['menu-set-language']({ payload: 'fr' })
 
-    expect($('open-btn').textContent).toBe('Ouvrir un fichier')
-    expect(document.querySelector('.player-hint').textContent).toBe(
-      'Glisse les poignées pour trimmer',
+    expect($('open-btn').textContent).toBe('Parcourir les fichiers')
+    expect(document.querySelector('.tl-hint').textContent).toBe(
+      'Faites glisser sur la piste pour marquer les parties à retirer',
     )
   })
 
@@ -1629,28 +2377,23 @@ describe('main — export settings and validation', () => {
     expect($('export-btn').disabled).toBe(false)
   })
 
-  it('refuses a trim range that is not a range, and says which field', async () => {
+  it('refuses cuts that leave nothing, and says which part of the screen', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-enabled').dispatchEvent(new Event('change'))
 
-    type('trim-start', '8')
-    type('trim-end', '8')
+    cutBetween(0, 12.5)
 
     expect($('export-btn').disabled).toBe(true)
-    expect($('export-hint').textContent).toContain('Invalid trim range')
-    expect($('trim-end').getAttribute('aria-invalid')).toBe('true')
+    expect($('export-hint').textContent).toContain('Everything is cut')
+    expect($('tl-track').getAttribute('aria-invalid')).toBe('true')
   })
 
-  it('clears the complaint once the value is fixed', async () => {
+  it('clears the complaint once something is left', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    type('trim-start', '8')
-    type('trim-end', '8')
+    cutBetween(0, 12.5)
 
-    type('trim-end', '10')
+    $('cut-clear').click()
 
     expect($('export-btn').disabled).toBe(false)
     expect($('export-hint').textContent).toBe('')
@@ -1660,9 +2403,7 @@ describe('main — export settings and validation', () => {
   it('refuses a fade longer than the audio kept', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    type('trim-start', '0')
-    type('trim-end', '1')
+    cutBetween(1, 12.5)
 
     type('fadein', '5')
 
@@ -1711,22 +2452,29 @@ describe('main — export settings and validation', () => {
   it('says it in French when the interface is French', async () => {
     await bootApp()
     await loadAudio()
-    $('trim-enabled').checked = true
-    type('trim-start', '8')
-    type('trim-end', '8')
+    cutBetween(0, 12.5)
 
     await menuHandlers['menu-set-language']({ payload: 'fr' })
 
-    expect($('export-hint').textContent).toContain('Plage de trim invalide')
+    expect($('export-hint').textContent).toContain('Tout est coupé')
   })
 
-  it('does not nag about settings that are switched off', async () => {
+  it('sends the cuts to the backend, as pairs of seconds', async () => {
     await bootApp()
     await loadAudio()
-    type('trim-start', '8')
-    type('trim-end', '2') // trim is off: the fields are ignored
+    cutBetween(1, 2)
+    cutBetween(5, 7.5)
+    save.mockResolvedValue('/home/me/out.wav')
 
-    expect($('export-btn').disabled).toBe(false)
+    $('export-btn').click()
+
+    await vi.waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith('process_audio', {
+        opts: expect.objectContaining({ cuts: [[1, 2], [5, 7.5]] }),
+      }),
+    )
+    const { opts } = invoke.mock.calls.find(([cmd]) => cmd === 'process_audio')[1]
+    expect(opts).not.toHaveProperty('trim_start')
   })
 
   it('sends numbers, not field text, for the filter', async () => {
@@ -1745,6 +2493,76 @@ describe('main — export settings and validation', () => {
         opts: expect.objectContaining({ filters: ['bandpass:2000:250'] }),
       }),
     )
+  })
+})
+
+describe('main — header and export dialog', () => {
+  it('keeps the export options in a dialog, opened by the header button', async () => {
+    await bootApp()
+    await loadAudio()
+    expect($('export-modal').classList.contains('hidden')).toBe(true)
+
+    $('export-open-btn').click()
+    expect($('export-modal').classList.contains('hidden')).toBe(false)
+
+    $('export-dismiss').click()
+    expect($('export-modal').classList.contains('hidden')).toBe(true)
+
+    $('export-open-btn').click()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect($('export-modal').classList.contains('hidden')).toBe(true)
+
+    $('export-open-btn').click()
+    $('export-modal').click()
+    expect($('export-modal').classList.contains('hidden')).toBe(true)
+  })
+
+  it('cannot be closed while exporting, and closes itself when done', async () => {
+    await bootApp()
+    await loadAudio()
+    $('export-open-btn').click()
+    save.mockResolvedValue('/home/me/out.wav')
+    const running = deferred()
+    invoke.mockImplementation((cmd) => (cmd === 'process_audio' ? running.promise : Promise.resolve(undefined)))
+    $('export-btn').click()
+    await vi.waitFor(() => expect($('export-btn').classList.contains('processing')).toBe(true))
+
+    $('export-close').click()
+    expect($('export-modal').classList.contains('hidden')).toBe(false)
+    expect($('export-dismiss').classList.contains('hidden')).toBe(true)
+    menuHandlers['export-progress']({ payload: 40 })
+    expect($('export-progress-fill').style.width).toBe('40%')
+
+    running.resolve()
+    await vi.waitFor(() => expect($('export-modal').classList.contains('hidden')).toBe(true))
+    expect($('export-dismiss').classList.contains('hidden')).toBe(false)
+  })
+
+  it('undoes and redoes from the header, and greys the buttons out when there is nothing to do', async () => {
+    await bootApp()
+    await loadAudio()
+    expect($('undo-btn').disabled).toBe(true)
+    expect($('redo-btn').disabled).toBe(true)
+
+    document.querySelector('.preset[data-v="2.0"]').click()
+    expect($('undo-btn').disabled).toBe(false)
+
+    $('undo-btn').click()
+    expect($('speed').value).toBe('3')
+    expect($('undo-btn').disabled).toBe(true)
+    expect($('redo-btn').disabled).toBe(false)
+
+    $('redo-btn').click()
+    expect($('speed').value).toBe('6')
+  })
+
+  it('only shows the WAV sample format for WAV', async () => {
+    await bootApp()
+    await loadAudio()
+    expect($('depth-row').classList.contains('hidden')).toBe(false)
+
+    document.querySelector('.fmt[data-fmt="mp3"]').click()
+    expect($('depth-row').classList.contains('hidden')).toBe(true)
   })
 })
 
@@ -1964,49 +2782,40 @@ describe('main — keyboard', () => {
     expect($('time-current').textContent).toBe('0:06')
   })
 
-  it('sets the trim start at the playhead with I, enabling trim', async () => {
+  it('marks the start of a cut with I and its end with O, at the playhead', async () => {
     await bootApp()
     await loadAudio()
     press($('waveform'), { key: 'ArrowRight', shiftKey: true }) // 5 s
-
     press($('waveform'), { key: 'i' })
-
-    expect($('trim-enabled').checked).toBe(true)
-    expect($('trim-start').value).toBe('5.00')
-  })
-
-  it('sets the trim end at the playhead with O', async () => {
-    await bootApp()
-    await loadAudio()
-    for (let i = 0; i < 2; i++) press($('waveform'), { key: 'ArrowRight', shiftKey: true }) // 10 s
+    press($('waveform'), { key: 'ArrowRight', shiftKey: true }) // 10 s
 
     press($('waveform'), { key: 'o' })
 
-    expect($('trim-enabled').checked).toBe(true)
-    expect($('trim-end').value).toBe('10.00')
+    expect(document.querySelectorAll('.tl-cut')).toHaveLength(1)
+    expect($('cut-start').value).toBe('0:05.0')
+    expect($('cut-end').value).toBe('0:10.0')
   })
 
-  it('keeps the trim ends apart and inside the file', async () => {
+  it('makes no cut from an O without an I', async () => {
     await bootApp()
     await loadAudio()
-    press($('waveform'), { key: 'o' }) // playhead at 0: end cannot sit on the start
-    expect($('trim-end').value).toBe('0.10')
+    press($('waveform'), { key: 'ArrowRight', shiftKey: true })
 
-    for (let i = 0; i < 4; i++) press($('waveform'), { key: 'ArrowRight', shiftKey: true }) // 12.5 s (the end)
-    press($('waveform'), { key: 'i' })
-    expect(parseFloat($('trim-start').value)).toBeLessThanOrEqual(0.1 + 1e-9 + parseFloat($('trim-end').value))
     press($('waveform'), { key: 'o' })
-    expect(parseFloat($('trim-end').value)).toBeLessThanOrEqual(12.5)
+
+    expect(document.querySelectorAll('.tl-cut')).toHaveLength(0)
   })
 
-  it('redraws and re-validates after a keyboard trim', async () => {
+  it('redraws and re-validates after a keyboard cut', async () => {
     await bootApp()
     await loadAudio()
-    ctx2d.arcTo.mockClear()
-
     press($('waveform'), { key: 'i' })
+    press($('waveform'), { key: 'ArrowRight', shiftKey: true })
+    ctx2d.fillRect.mockClear()
 
-    expect(ctx2d.arcTo).toHaveBeenCalled() // the handles are drawn
+    press($('waveform'), { key: 'o' })
+
+    expect(ctx2d.fillRect).toHaveBeenCalled()
     expect($('export-btn').disabled).toBe(false)
   })
 
@@ -2050,7 +2859,8 @@ describe('main — accessibility and markup', () => {
     await bootApp()
 
     expect($('play-btn').getAttribute('aria-label')).toBe('Space to play/pause')
-    expect($('trim-enabled').getAttribute('aria-label')).toBe('Enable trim')
+    expect($('seekbar').getAttribute('aria-label')).toBe('Seek')
+    expect($('undo-btn').getAttribute('aria-label')).toBe('Undo')
     expect($('waveform').getAttribute('aria-label')).toContain('Waveform')
   })
 
@@ -2059,7 +2869,8 @@ describe('main — accessibility and markup', () => {
 
     await menuHandlers['menu-set-language']({ payload: 'fr' })
 
-    expect($('trim-enabled').getAttribute('aria-label')).toBe('Activer le trim')
+    expect($('seekbar').getAttribute('aria-label')).toBe('Position de lecture')
+    expect($('redo-btn').getAttribute('aria-label')).toBe('Rétablir')
   })
 
   it('ties every label to its field', async () => {
@@ -2211,7 +3022,7 @@ describe('main — About dialog', () => {
     await bootApp()
     menuHandlers['menu-about']({ payload: '1.0.0' })
 
-    const dialog = document.querySelector('[role="dialog"]')
+    const dialog = document.querySelector('.about-card[role="dialog"]')
     expect(document.getElementById(dialog.getAttribute('aria-labelledby')).textContent).toBe(
       'About LightCutSoundz',
     )
@@ -2247,19 +3058,6 @@ describe('main — opening from outside', () => {
 })
 
 describe('main — fading and filter edge cases', () => {
-  it('clears the trim handles and the shading when trim is switched off again', async () => {
-    await bootApp()
-    await loadAudio()
-    $('trim-enabled').checked = true
-    $('trim-enabled').dispatchEvent(new Event('change'))
-    ctx2d.arcTo.mockClear()
-
-    $('trim-enabled').checked = false
-    $('trim-enabled').dispatchEvent(new Event('change'))
-
-    expect(ctx2d.arcTo).not.toHaveBeenCalled()
-  })
-
   it('redraws the bars only when something that changes them did', async () => {
     await bootApp()
     await loadAudio()
@@ -2271,20 +3069,19 @@ describe('main — fading and filter edge cases', () => {
     runFrame()
     runFrame()
 
-    expect(ctx2d.fillRect).not.toHaveBeenCalled()
+    // Only the visualisation's few bars, not the waveform's 900.
+    expect(ctx2d.fillRect.mock.calls.length).toBeLessThan(AUDIO_INFO.waveform.length)
     expect(ctx2d.drawImage).toHaveBeenCalled()
   })
 
-  it('redraws the bars when the trim changes', async () => {
+  it('does not redraw the 900 bars when a cut is made', async () => {
     await bootApp()
     await loadAudio()
     ctx2d.fillRect.mockClear()
 
-    $('trim-enabled').checked = true
-    $('trim-start').value = '3'
-    $('trim-enabled').dispatchEvent(new Event('change'))
+    cutBetween(3, 4)
 
-    expect(ctx2d.fillRect).toHaveBeenCalled()
+    expect(ctx2d.fillRect.mock.calls.length).toBeLessThan(AUDIO_INFO.waveform.length)
   })
 
   it('does not resize the canvas bitmap on every frame', async () => {
@@ -2640,7 +3437,7 @@ describe('main — changelog', () => {
     expect(dialog.querySelector('#changelog-title').textContent).toBe('What’s new')
     const titles = [...dialog.querySelectorAll('h3')].map((h) => h.textContent)
     // Nothing is unreleased right after a release: the newest entry leads.
-    expect(titles[0]).toBe('v1.1.0' + '2026-10-26')
+    expect(titles[0]).toBe('v1.2.0' + '2026-10-28')
     expect(titles).toContain('v1.0.0' + '2026-08-19')
   })
 
@@ -2668,7 +3465,7 @@ describe('main — changelog', () => {
 
     const dialog = document.querySelector('#changelog-dialog')
     expect(dialog.querySelector('#changelog-title').textContent).toBe('Nouveautés')
-    expect(dialog.querySelector('h3').textContent).toBe('v1.1.0' + '2026-10-26')
+    expect(dialog.querySelector('h3').textContent).toBe('v1.2.0' + '2026-10-28')
     expect([...dialog.querySelectorAll('h4')].map((h) => h.textContent)).toContain('Ajouté')
   })
 
@@ -2690,18 +3487,29 @@ describe('main — changelog', () => {
     expect(document.querySelector('#changelog-dialog')).toBeNull()
   })
 
-  it('cycles the focus between the scrolling text and its button', async () => {
+  it('cycles the focus between the close cross, the scrolling text and the button', async () => {
     const dialog = await open_()
-    const button = dialog.querySelector('button')
+    const button = dialog.querySelector('.btn-primary')
+    const cross = dialog.querySelector('.dialog-close')
     const text = dialog.querySelector('.changelog-body')
+    const tab = (shiftKey = false) =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey, cancelable: true }))
     expect(document.activeElement).toBe(button)
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }))
+    tab()
+    expect(document.activeElement).toBe(cross)
+    tab()
     expect(document.activeElement).toBe(text)
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }))
+    tab()
     expect(document.activeElement).toBe(button)
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true }))
+    tab(true)
     expect(document.activeElement).toBe(text)
+  })
+
+  it('closes with the cross as well as with the button', async () => {
+    const dialog = await open_()
+    dialog.querySelector('.dialog-close').click()
+    expect(document.getElementById('changelog-dialog')).toBeNull()
   })
 
   it('leaves the space bar alone while open', async () => {

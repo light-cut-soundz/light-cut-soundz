@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { LANGUAGES, applyLang, getT, keysOf, loadLang, saveLang } from './i18n.js'
+import { LANGUAGES, applyLang, getT, keysOf, loadLang, saveLang, loadTheme, saveTheme } from './i18n.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts) => readFileSync(join(HERE, ...parts), 'utf8')
 
-const NAMESPACES = 'changelog|header|drop|player|trim|fade|volume|speed|filter|export|msg|update|about|badge'
+const NAMESPACES = 'changelog|cut|header|drop|recent|player|trim|fade|volume|speed|filter|export|msg|update|about|badge'
 
 /** Every translation key the markup and the scripts mention: `data-i18n*`
  * attributes, and any quoted `namespace.name` string in the scripts. */
@@ -68,7 +68,7 @@ describe('getT', () => {
   })
 
   it('falls back to English for a missing key in another language, then to the key', () => {
-    expect(getT('xx')('header.open')).toBe('Open')
+    expect(getT('xx')('header.open')).toBe('Open an audio file')
     expect(getT('fr')('no.such.key')).toBe('no.such.key')
   })
 })
@@ -104,10 +104,32 @@ describe('applyLang', () => {
 
     applyLang('fr')
 
-    expect(document.querySelector('span').textContent).toBe('Ouvrir')
+    expect(document.querySelector('span').textContent).toBe('Ouvrir un fichier audio')
     const b = document.querySelector('button')
     expect(b.title).toBe('Espace pour lire/mettre en pause')
     expect(b.getAttribute('aria-label')).toBe('Espace pour lire/mettre en pause')
     expect(document.documentElement.lang).toBe('fr')
+  })
+})
+
+describe('theme storage', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('follows the system until a choice has been made', () => {
+    expect(loadTheme()).toBe('system')
+  })
+
+  it('remembers light and dark', () => {
+    saveTheme('light')
+    expect(loadTheme()).toBe('light')
+    saveTheme('dark')
+    expect(loadTheme()).toBe('dark')
+  })
+
+  it('refuses a theme it does not know', () => {
+    saveTheme('neon')
+    expect(loadTheme()).toBe('system')
+    localStorage.setItem('lcs-theme', 'neon')
+    expect(loadTheme()).toBe('system')
   })
 })

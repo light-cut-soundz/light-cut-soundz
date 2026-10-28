@@ -2083,9 +2083,10 @@ dependencies = [
 
 [[package]]
 name = "lightcutsoundz"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
+ "gtk",
  "hound",
  "rubato",
  "serde",

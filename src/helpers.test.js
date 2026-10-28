@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   fmtTime,
-  defaultTrimEnd,
   fadeGainAt,
   bandpassQ,
   clampFilterFreq,
@@ -39,33 +38,10 @@ describe('fmtTime', () => {
   })
 })
 
-describe('defaultTrimEnd', () => {
-  it('never exceeds the real duration', () => {
-    // The old toFixed(1) returned 12.4 here, which the backend rejected.
-    expect(defaultTrimEnd(12.36)).toBeLessThanOrEqual(12.36)
-    expect(defaultTrimEnd(12.36)).toBe(12.36)
-    expect(defaultTrimEnd(12.999)).toBe(12.99)
-    expect(defaultTrimEnd(0.058)).toBe(0.05)
-  })
-
-  it('rounds down for every duration in a sweep', () => {
-    for (let i = 1; i <= 2000; i++) {
-      const d = i * 0.017
-      expect(defaultTrimEnd(d)).toBeLessThanOrEqual(d)
-    }
-  })
-
-  it('handles degenerate durations', () => {
-    expect(defaultTrimEnd(0)).toBe(0)
-    expect(defaultTrimEnd(-1)).toBe(0)
-    expect(defaultTrimEnd(NaN)).toBe(0)
-  })
-})
-
 describe('fadeGainAt', () => {
   const region = { start: 10, end: 20, fadeIn: 2, fadeOut: 2 }
 
-  it('opens at silence and closes at silence, relative to the trim region', () => {
+  it('opens at silence and closes at silence, relative to the kept region', () => {
     expect(fadeGainAt(10, region)).toBeCloseTo(0)
     expect(fadeGainAt(20, region)).toBeCloseTo(0)
   })
@@ -150,9 +126,7 @@ describe('buildProcessOptions', () => {
     filePath: '/tmp/in.wav',
     format: 'wav',
     duration: 12.36,
-    trimEnabled: true,
-    trimStart: 1,
-    trimEnd: 12.4,
+    cuts: [{ id: 'a', start: 1, end: 12.4 }],
     fadeIn: 0,
     fadeOut: 0,
     normalize: false,
@@ -162,26 +136,24 @@ describe('buildProcessOptions', () => {
     filterBandwidth: 500,
   }
 
-  it('clamps a trim end past the real duration', () => {
-    // Regression: a rounded-up field value made the backend reject the export.
-    const opts = buildProcessOptions(ui, '/tmp/out.wav')
-    expect(opts.trim_end).toBe(12.36)
+  it('sends the cuts as [start, end] pairs', () => {
+    const opts = buildProcessOptions({ ...ui, cuts: [{ id: 'a', start: 2, end: 3 }, { id: 'b', start: 5, end: 6 }] }, '/tmp/out.wav')
+    expect(opts.cuts).toEqual([[2, 3], [5, 6]])
   })
 
-  it('clamps a negative trim start', () => {
-    const opts = buildProcessOptions({ ...ui, trimStart: -3 }, '/tmp/out.wav')
-    expect(opts.trim_start).toBe(0)
+  it('clamps a cut past the real duration', () => {
+    // Regression: a rounded-up value made the backend reject the export.
+    expect(buildProcessOptions(ui, '/tmp/out.wav').cuts).toEqual([[1, 12.36]])
   })
 
-  it('keeps the end at or after the start', () => {
-    const opts = buildProcessOptions({ ...ui, trimStart: 10, trimEnd: 2 }, '/tmp/out.wav')
-    expect(opts.trim_end).toBeGreaterThanOrEqual(opts.trim_start)
+  it('merges overlapping cuts', () => {
+    const cuts = [{ id: 'a', start: 1, end: 4 }, { id: 'b', start: 3, end: 6 }]
+    expect(buildProcessOptions({ ...ui, cuts }, '/o').cuts).toEqual([[1, 6]])
   })
 
-  it('sends null bounds when trim is off', () => {
-    const opts = buildProcessOptions({ ...ui, trimEnabled: false }, '/tmp/out.wav')
-    expect(opts.trim_start).toBeNull()
-    expect(opts.trim_end).toBeNull()
+  it('sends no cut when nothing is cut', () => {
+    expect(buildProcessOptions({ ...ui, cuts: [] }, '/o').cuts).toEqual([])
+    expect(buildProcessOptions({ ...ui, cuts: undefined }, '/o').cuts).toEqual([])
   })
 
   it('omits a neutral speed', () => {
@@ -210,9 +182,7 @@ describe('buildProcessOptions', () => {
   })
 
   it('tolerates a missing duration', () => {
-    const opts = buildProcessOptions({ ...ui, duration: NaN }, '/o')
-    expect(opts.trim_start).toBe(0)
-    expect(opts.trim_end).toBe(0)
+    expect(buildProcessOptions({ ...ui, duration: NaN }, '/o').cuts).toEqual([])
   })
 })
 
@@ -221,9 +191,7 @@ describe('buildProcessOptions — falsy field fallbacks', () => {
     filePath: '/in.wav',
     format: 'wav',
     duration: 30,
-    trimEnabled: true,
-    trimStart: 5,
-    trimEnd: 20,
+    cuts: [],
     fadeIn: 0,
     fadeOut: 0,
     normalize: false,
@@ -232,21 +200,6 @@ describe('buildProcessOptions — falsy field fallbacks', () => {
     filterFreq: '',
     filterBandwidth: '',
   }
-
-  it('treats a NaN trim start as 0', () => {
-    const opts = buildProcessOptions({ ...base, trimStart: NaN }, '/out.wav')
-    expect(opts.trim_start).toBe(0)
-  })
-
-  it('treats a NaN trim end as the full duration', () => {
-    const opts = buildProcessOptions({ ...base, trimEnd: NaN }, '/out.wav')
-    expect(opts.trim_end).toBe(30)
-  })
-
-  it('treats a zero trim end as the full duration', () => {
-    const opts = buildProcessOptions({ ...base, trimStart: 0, trimEnd: 0 }, '/out.wav')
-    expect(opts.trim_end).toBe(30)
-  })
 
   it('nulls out a NaN fade in', () => {
     const opts = buildProcessOptions({ ...base, fadeIn: NaN }, '/out.wav')
@@ -259,9 +212,8 @@ describe('buildProcessOptions — falsy field fallbacks', () => {
   })
 
   it('falls back to a zero duration when it is not a finite number', () => {
-    const opts = buildProcessOptions({ ...base, duration: undefined }, '/out.wav')
-    expect(opts.trim_start).toBe(0)
-    expect(opts.trim_end).toBe(0)
+    const opts = buildProcessOptions({ ...base, duration: undefined, cuts: [{ id: 'a', start: 1, end: 2 }] }, '/out.wav')
+    expect(opts.cuts).toEqual([])
   })
 })
 
@@ -339,9 +291,7 @@ describe('validateSettings', () => {
   const ok = {
     duration: 10,
     sampleRate: 44100,
-    trimEnabled: false,
-    trimStart: 0,
-    trimEnd: 10,
+    cuts: [],
     fadeIn: 0,
     fadeOut: 0,
     filterType: '',
@@ -353,32 +303,18 @@ describe('validateSettings', () => {
     expect(validateSettings(ok)).toBeNull()
   })
 
-  it('accepts a sound trim range', () => {
-    expect(validateSettings({ ...ok, trimEnabled: true, trimStart: 2, trimEnd: 8 })).toBeNull()
+  it('accepts cuts that leave some audio', () => {
+    expect(validateSettings({ ...ok, cuts: [{ id: 'a', start: 2, end: 8 }] })).toBeNull()
   })
 
-  it('rejects a trim whose end is not after its start', () => {
-    const p = validateSettings({ ...ok, trimEnabled: true, trimStart: 5, trimEnd: 5 })
-    expect(p).toMatchObject({ code: 'trim_range', field: 'trim-end' })
-    expect(p.params).toEqual({ start: '5.00', end: '5.00', total: '10.00' })
+  it('rejects cuts that leave nothing', () => {
+    const p = validateSettings({ ...ok, cuts: [{ id: 'a', start: 0, end: 4 }, { id: 'b', start: 4, end: 10 }] })
+    expect(p).toMatchObject({ code: 'trim_empty', field: 'tl-track' })
   })
 
-  it('quotes the range as the user typed it, not as it was clamped', () => {
-    const p = validateSettings({ ...ok, trimEnabled: true, trimStart: 9, trimEnd: 3 })
-    expect(p.params).toEqual({ start: '9.00', end: '3.00', total: '10.00' })
-  })
-
-  it('rejects a trim starting at the very end of the file', () => {
-    const p = validateSettings({ ...ok, trimEnabled: true, trimStart: 10, trimEnd: 12 })
-    expect(p.code).toBe('trim_range')
-  })
-
-  it('judges the trim as the export would send it, clamped to the duration', () => {
-    expect(validateSettings({ ...ok, trimEnabled: true, trimStart: 2, trimEnd: 99 })).toBeNull()
-  })
-
-  it('ignores the trim fields when trim is off', () => {
-    expect(validateSettings({ ...ok, trimStart: 9, trimEnd: 1 })).toBeNull()
+  it('judges the cuts as the export would send them, clamped to the duration', () => {
+    expect(validateSettings({ ...ok, cuts: [{ id: 'a', start: 2, end: 99 }] })).toBeNull()
+    expect(validateSettings({ ...ok, cuts: [{ id: 'a', start: 0, end: 99 }] }).code).toBe('trim_empty')
   })
 
   it('rejects a fade longer than the whole file', () => {
@@ -386,8 +322,8 @@ describe('validateSettings', () => {
     expect(p).toMatchObject({ code: 'fade_too_long', field: 'fadein', params: { which: 'in', secs: '11.00' } })
   })
 
-  it('measures the fade against the trimmed region', () => {
-    const trimmed = { ...ok, trimEnabled: true, trimStart: 4, trimEnd: 6 }
+  it('measures the fade against what the cuts leave', () => {
+    const trimmed = { ...ok, cuts: [{ id: 'a', start: 0, end: 4 }, { id: 'b', start: 6, end: 10 }] }
     expect(validateSettings({ ...trimmed, fadeOut: 2 })).toBeNull()
     expect(validateSettings({ ...trimmed, fadeOut: 3 })).toMatchObject({
       code: 'fade_too_long',
@@ -434,14 +370,12 @@ describe('validateSettings', () => {
   it('reports the first problem in the order the fields appear', () => {
     const p = validateSettings({
       ...ok,
-      trimEnabled: true,
-      trimStart: 5,
-      trimEnd: 5,
+      cuts: [{ id: 'a', start: 0, end: 10 }],
       fadeIn: 50,
       filterType: 'lowpass',
       filterFreq: '',
     })
-    expect(p.code).toBe('trim_range')
+    expect(p.code).toBe('trim_empty')
   })
 
   it('copes with a file whose duration is unknown', () => {
@@ -678,7 +612,7 @@ describe('buildProcessOptions — fade curve and WAV depth', () => {
 
 describe('validateSettings — slope and Q', () => {
   const ok = {
-    duration: 10, sampleRate: 44100, trimEnabled: false, trimStart: 0, trimEnd: 10,
+    duration: 10, sampleRate: 44100, cuts: [],
     fadeIn: 0, fadeOut: 0, filterType: 'lowpass', filterFreq: '1000', filterBandwidth: '500',
     filterSlope: '12', filterQ: '0.707',
   }

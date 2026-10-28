@@ -39,6 +39,63 @@ pub fn trim(buf: &mut AudioBuffer, start_secs: f64, end_secs: f64) -> Result<()>
     Ok(())
 }
 
+/// Removes the `cuts` (start, end in seconds) from the audio and joins what is
+/// left. Overlapping or out-of-order cuts are merged first; a cut is clamped to
+/// the audio, and what remains must not be empty.
+pub fn remove(buf: &mut AudioBuffer, cuts: &[(f64, f64)]) -> Result<()> {
+    if cuts.is_empty() {
+        return Ok(());
+    }
+    let frames = buf.num_frames();
+    let rate = buf.sample_rate as f64;
+    // Written so that NaN fails every comparison and lands in the error branch.
+    if let Some(&(start, end)) = cuts.iter().find(|&&(s, e)| !(s >= 0.0 && e > s)) {
+        return Err(coded(
+            "trim_range",
+            &[
+                ("start", format!("{start:.2}")),
+                ("end", format!("{end:.2}")),
+                ("total", format!("{:.2}", buf.duration_secs())),
+            ],
+            format!("Invalid cut {start:.3}:{end:.3}"),
+        ));
+    }
+    let mut ranges: Vec<(usize, usize)> = cuts
+        .iter()
+        .map(|&(s, e)| {
+            let a = ((s * rate).round() as usize).min(frames);
+            let b = ((e * rate).round() as usize).min(frames);
+            (a, b)
+        })
+        .filter(|&(a, b)| b > a)
+        .collect();
+    ranges.sort_unstable();
+    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(ranges.len());
+    for (a, b) in ranges {
+        match merged.last_mut() {
+            Some(last) if a <= last.1 => last.1 = last.1.max(b),
+            _ => merged.push((a, b)),
+        }
+    }
+    let removed: usize = merged.iter().map(|&(a, b)| b - a).sum();
+    if removed >= frames {
+        return Err(coded("trim_empty", &[], "Nothing is left after the cuts"));
+    }
+    for ch in buf.samples.iter_mut() {
+        let mut write = 0;
+        let mut read = 0;
+        for &(a, b) in &merged {
+            ch.copy_within(read..a, write);
+            write += a - read;
+            read = b;
+        }
+        ch.copy_within(read..frames, write);
+        write += frames - read;
+        ch.truncate(write);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +203,63 @@ mod tests {
     fn trim_of_an_empty_buffer_is_rejected() {
         let mut buf = make_buf(0, 44_100);
         assert!(trim(&mut buf, 0.0, 1.0).is_err());
+    }
+
+    #[test]
+    fn remove_joins_what_is_left() {
+        let mut buf = AudioBuffer {
+            samples: vec![(0..10).map(|i| i as f32).collect()],
+            sample_rate: 10,
+        };
+        remove(&mut buf, &[(0.2, 0.4), (0.7, 0.8)]).unwrap();
+        assert_eq!(buf.samples[0], vec![0.0, 1.0, 4.0, 5.0, 6.0, 8.0, 9.0]);
+    }
+
+    #[test]
+    fn remove_merges_overlapping_and_unordered_cuts() {
+        let mut buf = AudioBuffer {
+            samples: vec![(0..10).map(|i| i as f32).collect()],
+            sample_rate: 10,
+        };
+        remove(&mut buf, &[(0.5, 0.8), (0.2, 0.6)]).unwrap();
+        assert_eq!(buf.samples[0], vec![0.0, 1.0, 8.0, 9.0]);
+    }
+
+    #[test]
+    fn remove_applies_to_every_channel() {
+        let mut buf = make_stereo(10, 10);
+        remove(&mut buf, &[(0.0, 0.5)]).unwrap();
+        assert_eq!(buf.samples[0].len(), 5);
+        assert_eq!(buf.samples[1].len(), 5);
+    }
+
+    #[test]
+    fn remove_clamps_a_cut_past_the_end() {
+        let mut buf = make_buf(10, 10);
+        remove(&mut buf, &[(0.5, 5.0)]).unwrap();
+        assert_eq!(buf.samples[0].len(), 5);
+    }
+
+    #[test]
+    fn remove_nothing_is_a_no_op() {
+        let mut buf = make_buf(10, 10);
+        remove(&mut buf, &[]).unwrap();
+        assert_eq!(buf.samples[0].len(), 10);
+    }
+
+    #[test]
+    fn remove_refuses_to_leave_nothing() {
+        let mut buf = make_buf(10, 10);
+        let e = crate::error::CmdError::from(remove(&mut buf, &[(0.0, 1.0)]).unwrap_err());
+        assert_eq!(e.code, "trim_empty");
+    }
+
+    #[test]
+    fn remove_rejects_an_invalid_cut() {
+        let mut buf = make_buf(10, 10);
+        for cut in [(0.5, 0.5), (0.6, 0.2), (-0.1, 0.3), (f64::NAN, 0.3)] {
+            let e = crate::error::CmdError::from(remove(&mut buf, &[cut]).unwrap_err());
+            assert_eq!(e.code, "trim_range", "{cut:?}");
+        }
     }
 }

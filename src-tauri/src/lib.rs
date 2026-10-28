@@ -4,6 +4,7 @@ mod error;
 mod job;
 mod menu;
 mod ops;
+mod recent;
 mod tags;
 
 use anyhow::Result;
@@ -35,6 +36,9 @@ struct ProcessOptions {
     format: String,
     trim_start: Option<f64>,
     trim_end: Option<f64>,
+    /// Ranges (start, end in seconds) to remove from the audio.
+    #[serde(default)]
+    cuts: Vec<(f64, f64)>,
     fade_in: Option<f64>,
     fade_out: Option<f64>,
     /// `"linear"` (the default) or `"equal-power"`.
@@ -190,7 +194,8 @@ async fn allow_asset<R: Runtime>(app: AppHandle<R>, path: String) -> Result<(), 
 }
 
 #[tauri::command]
-async fn load_audio(
+async fn load_audio<R: Runtime>(
+    app: AppHandle<R>,
     approved: State<'_, Approved>,
     cache: State<'_, DecodeCache>,
     path: String,
@@ -198,7 +203,10 @@ async fn load_audio(
 ) -> Result<AudioInfo, CmdError> {
     approved.check_input(&path).map_err(CmdError::from)?;
     let cache = cache.inner().clone();
-    blocking(move || load_audio_blocking(&cache, &path, points)).await
+    let recorded = path.clone();
+    let info = blocking(move || load_audio_blocking(&cache, &path, points)).await?;
+    recent::record(&app, &recorded);
+    Ok(info)
 }
 
 /// A native file dialog on the blocking pool (it waits for the user), parented
@@ -298,11 +306,12 @@ fn check_format(opts: &ProcessOptions) -> Result<()> {
     }
 }
 
-/// trim → fades → speed → filters → normalise. Normalising comes last on
+/// cuts → trim → fades → speed → filters → normalise. Normalising comes last on
 /// purpose: speed and filters change the peak, and the promised −1 dBFS must
 /// describe the file that is actually written.
 fn run_pipeline(opts: &ProcessOptions, buf: &mut AudioBuffer, job: &Job) -> Result<()> {
     job.check()?;
+    trim::remove(buf, &opts.cuts)?;
     if opts.trim_start.is_some() || opts.trim_end.is_some() {
         let start = opts.trim_start.unwrap_or(0.0);
         let end = opts.trim_end.unwrap_or_else(|| buf.duration_secs());
@@ -405,6 +414,17 @@ pub fn run() {
     if let Some(path) = &launch_file {
         approved.allow_input(path);
     }
+    // Before the first window: the web view reads the font settings when it is
+    // created. Chromium (LightCutVidz) draws unhinted text, GTK hints it to the
+    // pixel grid, which makes the capitals a pixel shorter than in the other app.
+    #[cfg(target_os = "linux")]
+    if gtk::init().is_ok() {
+        use gtk::prelude::GtkSettingsExt;
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_gtk_xft_hinting(0);
+            settings.set_gtk_xft_hintstyle(Some("hintnone"));
+        }
+    }
     let builder = tauri::Builder::default();
 
     // A second launch ("Open with…" while the app is running) hands its file to
@@ -423,11 +443,14 @@ pub fn run() {
         .manage(approved)
         .manage(DecodeCache::default())
         .manage(ExportControl::default())
+        .manage(menu::MenuState::default())
         .manage(PendingOpen(Mutex::new(launch_file)))
         .setup(|app| {
             // English at startup; the front end calls `set_menu_language` with the
             // saved language as soon as it is ready.
-            menu::install(app.handle(), menu::Lang::default())?;
+            menu::refresh(app.handle());
+            #[cfg(target_os = "linux")]
+            menu::style_menu_bar();
             Ok(())
         })
         .on_menu_event(|app, event| menu::handle(app, event.id().as_ref()))
@@ -449,7 +472,11 @@ pub fn run() {
             process_audio,
             cancel_export,
             take_pending_file,
+            recent::get_recent,
+            recent::forget_recent,
             menu::set_menu_language,
+            menu::set_theme,
+            menu::set_undo_redo,
         ])
         .build(tauri::generate_context!())
         .expect("error building soundZ");
@@ -789,13 +816,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = write_wav(&dir, "a.wav", 4410, 1);
 
-        let refused =
-            tauri::async_runtime::block_on(load_audio(app.state(), app.state(), path.clone(), 10));
+        let refused = tauri::async_runtime::block_on(load_audio(
+            app.handle().clone(),
+            app.state(),
+            app.state(),
+            path.clone(),
+            10,
+        ));
         assert_eq!(refused.unwrap_err().code, "path_not_approved");
 
         app.state::<Approved>().allow_input(&path);
-        let info =
-            tauri::async_runtime::block_on(load_audio(app.state(), app.state(), path, 10)).unwrap();
+        let info = tauri::async_runtime::block_on(load_audio(
+            app.handle().clone(),
+            app.state(),
+            app.state(),
+            path,
+            10,
+        ))
+        .unwrap();
         assert_eq!(info.waveform.len(), 10);
     }
 
@@ -888,6 +926,7 @@ mod tests {
             format: "wav".into(),
             trim_start: None,
             trim_end: None,
+            cuts: Vec::new(),
             fade_in: None,
             fade_out: None,
             fade_curve: None,
@@ -1051,6 +1090,29 @@ mod tests {
         process(&opts).unwrap();
         let decoded = audio::decode(&output).unwrap();
         assert_eq!(decoded.num_frames(), 22_050);
+    }
+
+    #[test]
+    fn process_audio_removes_the_cuts_before_anything_else() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = write_wav(&dir, "in.wav", 44_100, 1);
+        let output = dir.path().join("out.wav").to_str().unwrap().to_string();
+        let mut opts = base_opts(input, output.clone());
+        opts.cuts = vec![(0.0, 0.25), (0.5, 0.75)];
+
+        process(&opts).unwrap();
+        assert_eq!(audio::decode(&output).unwrap().num_frames(), 22_050);
+    }
+
+    #[test]
+    fn process_audio_refuses_cuts_that_leave_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let input = write_wav(&dir, "in.wav", 4410, 1);
+        let output = dir.path().join("out.wav").to_str().unwrap().to_string();
+        let mut opts = base_opts(input, output);
+        opts.cuts = vec![(0.0, 5.0)];
+
+        assert_eq!(code_of(process(&opts).unwrap_err()), "trim_empty");
     }
 
     #[test]

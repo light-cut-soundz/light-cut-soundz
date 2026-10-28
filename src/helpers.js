@@ -1,6 +1,8 @@
 // Pure helpers shared by the editor UI. Kept free of DOM access so they can be
 // unit-tested without a browser.
 
+import { cutRanges, keptSegments, keptDuration } from './cuts.js'
+
 /** −1 dBFS, the peak the backend normalises to (`normalize::TARGET_PEAK`). */
 export const TARGET_PEAK = 0.8912509
 
@@ -10,17 +12,6 @@ export function fmtTime(secs) {
   const m = Math.floor(secs / 60)
   const s = Math.floor(secs % 60).toString().padStart(2, '0')
   return `${m}:${s}`
-}
-
-/**
- * Default value for the trim-end field.
- *
- * Rounding up here is what used to make every export fail: the backend rejects
- * any end bound past the real duration, so this always rounds down.
- */
-export function defaultTrimEnd(duration) {
-  if (!Number.isFinite(duration) || duration <= 0) return 0
-  return Math.floor(duration * 100) / 100
 }
 
 /** Gain of a fade-in `x` of the way through (0 → 1), for a curve name. */
@@ -121,27 +112,13 @@ export function buildFilterSpecs({ type, freq, bandwidth, slope = 12, q = null }
   return []
 }
 
-/**
- * The kept region, clamped to the real duration: the field values are rounded
- * for display and must never claim more audio than the file holds.
- */
-function resolveTrim(ui) {
-  if (!ui.trimEnabled) return { start: null, end: null }
-  const duration = Number.isFinite(ui.duration) ? ui.duration : 0
-  const start = Math.max(0, Math.min(ui.trimStart || 0, duration))
-  const end = Math.max(start, Math.min(ui.trimEnd || duration, duration))
-  return { start, end }
-}
-
 /** Payload for the `process_audio` command. */
 export function buildProcessOptions(ui, outputPath) {
-  const { start, end } = resolveTrim(ui)
   return {
     input: ui.filePath,
     output: outputPath,
     format: ui.format,
-    trim_start: start,
-    trim_end: end,
+    cuts: cutRanges(ui.cuts ?? [], Number.isFinite(ui.duration) ? ui.duration : 0),
     fade_in: ui.fadeIn > 0 ? ui.fadeIn : null,
     fade_out: ui.fadeOut > 0 ? ui.fadeOut : null,
     fade_curve: ui.fadeCurve === 'equal-power' ? 'equal-power' : 'linear',
@@ -168,24 +145,10 @@ export function buildProcessOptions(ui, outputPath) {
 export function validateSettings(ui) {
   const duration = Number.isFinite(ui.duration) ? ui.duration : 0
 
-  const { start, end } = resolveTrim(ui)
-  if (ui.trimEnabled && !(end > start)) {
-    // The values as typed, not as clamped: a message that says "9.00–9.00" for an
-    // end of 3 would be baffling.
-    const typedStart = Number.isFinite(ui.trimStart) ? ui.trimStart : 0
-    const typedEnd = Number.isFinite(ui.trimEnd) ? ui.trimEnd : duration
-    return {
-      code: 'trim_range',
-      field: 'trim-end',
-      params: {
-        start: typedStart.toFixed(2),
-        end: typedEnd.toFixed(2),
-        total: duration.toFixed(2),
-      },
-    }
-  }
+  // Whatever the cuts leave is what is exported.
+  const region = duration > 0 ? keptDuration(keptSegments(ui.cuts ?? [], duration)) : 0
+  if (duration > 0 && !(region > 0)) return { code: 'trim_empty', field: 'tl-track', params: {} }
 
-  const region = ui.trimEnabled ? end - start : duration
   for (const [which, secs, field] of [
     ['in', ui.fadeIn, 'fadein'],
     ['out', ui.fadeOut, 'fadeout'],

@@ -1,24 +1,41 @@
 const LANG_KEY = 'lcs-lang'
+const THEME_KEY = 'lcs-theme'
+const THEMES = ['system', 'light', 'dark']
 
 const dict = {
   en: {
     // Header
     'header.openOther': 'Open another file',
-    'header.open': 'Open',
+    'header.open': 'Open an audio file',
+    'header.undo': 'Undo',
+    'header.redo': 'Redo',
 
     // Drop zone
     'drop.title': 'Drop an audio file here',
     'drop.or': 'or',
-    'drop.open': 'Open a file',
+    'drop.open': 'Browse files',
+
+    // Recent files
+    'recent.title': 'Recent',
+    'recent.clear': 'Clear',
+    'recent.remove': 'Remove from the list',
 
     // Player
     'player.playPause': 'Space to play/pause',
-    'player.hint': 'Drag the handles to trim',
 
     // Trim
-    'trim.title': 'Trim',
-    'trim.start': 'Start',
-    'trim.end': 'End',
+    'cut.title': 'CUTS',
+    'cut.countOne': '{n} cut',
+    'cut.countMany': '{n} cuts',
+    'cut.clear': 'Clear all',
+    'cut.sideHint': 'On the timeline below, drag to select the parts to remove. Several selections are possible.',
+    'cut.hint': 'Drag on the track to mark the parts to remove',
+    'cut.selected': 'Selected cut:',
+    'cut.placeholder': 'Click a cut to edit its times',
+    'cut.start': 'Start',
+    'cut.end': 'End',
+    'cut.delete': 'Delete cut',
+    'cut.resize': 'Drag to resize',
 
     // Fade
     'fade.title': 'Fade',
@@ -47,6 +64,8 @@ const dict = {
 
     // Export
     'export.run': 'Export',
+    'export.title': 'Export',
+    'export.close': 'Close',
     'export.cancel': 'Cancel',
     'export.depth': 'WAV sample format',
     'depth.float32': '32-bit float',
@@ -85,11 +104,11 @@ const dict = {
 
     // Accessibility labels
     'player.waveform':
-      'Waveform. Click or use the arrow keys to move the playhead; I and O set the trim start and end at the playhead.',
-    'trim.toggle': 'Enable trim',
+      'Waveform. Click or use the arrow keys to move the playhead; I marks the start of a cut and O its end, at the playhead.',
+    'player.seek': 'Seek',
     // Errors (codes sent by the backend, and by the checks made before it)
     'err.trim_range': 'Invalid trim range {start}–{end} s (the audio is {total} s long)',
-    'err.trim_empty': 'The selected range contains no audio',
+    'err.trim_empty': 'Everything is cut: there would be no audio to export',
     'err.fade_too_long.in': 'The fade in ({secs} s) is longer than the audio kept',
     'err.fade_too_long.out': 'The fade out ({secs} s) is longer than the audio kept',
     'err.filter_value': 'Invalid frequency or bandwidth: “{value}”',
@@ -128,21 +147,36 @@ const dict = {
   fr: {
     // Header
     'header.openOther': 'Ouvrir un autre fichier',
-    'header.open': 'Ouvrir',
+    'header.open': 'Ouvrir un fichier audio',
+    'header.undo': 'Annuler',
+    'header.redo': 'Rétablir',
 
     // Drop zone
-    'drop.title': 'Dépose un fichier audio ici',
+    'drop.title': 'Déposez un fichier audio ici',
     'drop.or': 'ou',
-    'drop.open': 'Ouvrir un fichier',
+    'drop.open': 'Parcourir les fichiers',
+
+    // Fichiers récents
+    'recent.title': 'Récents',
+    'recent.clear': 'Effacer',
+    'recent.remove': 'Retirer de la liste',
 
     // Player
     'player.playPause': 'Espace pour lire/mettre en pause',
-    'player.hint': 'Glisse les poignées pour trimmer',
 
     // Trim
-    'trim.title': 'Trim',
-    'trim.start': 'Début',
-    'trim.end': 'Fin',
+    'cut.title': 'COUPES',
+    'cut.countOne': '{n} coupe',
+    'cut.countMany': '{n} coupes',
+    'cut.clear': 'Tout effacer',
+    'cut.sideHint': 'Sur la timeline ci-dessous, faites glisser pour sélectionner les zones à supprimer. Plusieurs sélections possibles.',
+    'cut.hint': 'Faites glisser sur la piste pour marquer les parties à retirer',
+    'cut.selected': 'Coupe sélectionnée :',
+    'cut.placeholder': 'Cliquez sur une coupe pour modifier ses temps',
+    'cut.start': 'Début',
+    'cut.end': 'Fin',
+    'cut.delete': 'Supprimer la coupe',
+    'cut.resize': 'Glisser pour redimensionner',
 
     // Fade
     'fade.title': 'Fondu',
@@ -171,6 +205,8 @@ const dict = {
 
     // Export
     'export.run': 'Exporter',
+    'export.title': 'Exporter',
+    'export.close': 'Fermer',
     'export.cancel': 'Annuler',
     'export.depth': 'Format des échantillons WAV',
     'depth.float32': 'Flottant 32 bits',
@@ -209,11 +245,11 @@ const dict = {
 
     // Accessibility labels
     'player.waveform':
-      'Forme d’onde. Clique ou utilise les flèches pour déplacer la tête de lecture ; I et O placent le début et la fin du trim sur la tête de lecture.',
-    'trim.toggle': 'Activer le trim',
+      'Forme d’onde. Clique ou utilise les flèches pour déplacer la tête de lecture ; I marque le début d’une coupe et O sa fin, à la tête de lecture.',
+    'player.seek': 'Position de lecture',
     // Errors (codes sent by the backend, and the checks made before it)
     'err.trim_range': "Plage de trim invalide {start}–{end} s (l'audio dure {total} s)",
-    'err.trim_empty': 'La plage sélectionnée ne contient aucun audio',
+    'err.trim_empty': 'Tout est coupé : il n’y aurait aucun audio à exporter',
     'err.fade_too_long.in': "Le fondu entrant ({secs} s) dépasse l'audio conservé",
     'err.fade_too_long.out': "Le fondu sortant ({secs} s) dépasse l'audio conservé",
     'err.filter_value': 'Fréquence ou largeur invalide : « {value} »',
@@ -260,6 +296,15 @@ export function loadLang() {
 
 export function saveLang(lang) {
   localStorage.setItem(LANG_KEY, LANGUAGES.includes(lang) ? lang : 'en')
+}
+
+export function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY)
+  return THEMES.includes(saved) ? saved : 'system'
+}
+
+export function saveTheme(theme) {
+  localStorage.setItem(THEME_KEY, THEMES.includes(theme) ? theme : 'system')
 }
 
 export function keysOf(lang) {
