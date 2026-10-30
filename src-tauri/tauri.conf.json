@@ -1,0 +1,132 @@
+{
+  "productName": "LightCutSoundz",
+  "version": "1.0.0",
+  "identifier": "dev.lightcutsoundz",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "LightCutSoundz",
+        "width": 960,
+        "height": 700,
+        "resizable": true,
+        "center": true,
+        "minWidth": 900,
+        "minHeight": 620
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost asset: http://asset.localhost",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost asset: http://asset.localhost ws://localhost:5173 http://localhost:5173",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyMzM0MEQwNEVENkU3OTIKUldTUzU5Wk8wRUF6RWthVkQ5SXQvQkpzYkxia3Z5VFlGbFdzelpTbGZjVFZLNXJGbG0yL2srYmEK",
+      "endpoints": ["https://github.com/light-cut-soundz/light-cut-soundz/releases/latest/download/latest.json"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["deb", "rpm", "appimage", "app"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/256x256.png",
+      "icons/512x512.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/lightcutsoundz-ffmpeg"],
+    "category": "Music",
+    "linux": {
+      "deb": {
+        "depends": ["gstreamer1.0-plugins-good"],
+        "recommends": ["gstreamer1.0-libav"]
+      },
+      "rpm": {
+        "depends": ["gstreamer1-plugins-good"],
+        "recommends": ["gstreamer1-libav"]
+      }
+    },
+    "fileAssociations": [
+      {
+        "name": "MP3 audio",
+        "ext": ["mp3"],
+        "mimeType": "audio/mpeg",
+        "role": "Viewer"
+      },
+      {
+        "name": "WAV audio",
+        "ext": ["wav"],
+        "mimeType": "audio/x-wav",
+        "role": "Viewer"
+      },
+      {
+        "name": "FLAC audio",
+        "ext": ["flac"],
+        "mimeType": "audio/flac",
+        "role": "Viewer"
+      },
+      {
+        "name": "Ogg audio",
+        "ext": ["ogg"],
+        "mimeType": "audio/ogg",
+        "role": "Viewer"
+      },
+      {
+        "name": "AAC audio",
+        "ext": ["aac"],
+        "mimeType": "audio/aac",
+        "role": "Viewer"
+      },
+      {
+        "name": "MPEG-4 audio",
+        "ext": ["m4a"],
+        "mimeType": "audio/mp4",
+        "role": "Viewer"
+      },
+      {
+        "name": "AIFF audio",
+        "ext": ["aif", "aiff"],
+        "mimeType": "audio/x-aiff",
+        "role": "Viewer"
+      },
+      {
+        "name": "CAF audio",
+        "ext": ["caf"],
+        "mimeType": "audio/x-caf",
+        "role": "Viewer"
+      },
+      {
+        "name": "Matroska audio",
+        "ext": ["mka"],
+        "mimeType": "audio/x-matroska",
+        "role": "Viewer"
+      },
+      {
+        "name": "WebM audio",
+        "ext": ["webm"],
+        "mimeType": "audio/webm",
+        "role": "Viewer"
+      }
+    ],
+    "resources": {
+      "../LICENSE": "licenses/LICENSE",
+      "../THIRD_PARTY_LICENSES.md": "licenses/THIRD_PARTY_LICENSES.md",
+      "../THIRD_PARTY_LICENSES.html": "licenses/THIRD_PARTY_LICENSES_RUST.html",
+      "../licenses/LGPL-2.1.txt": "licenses/LGPL-2.1.txt"
+    }
+  }
+}

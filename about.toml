@@ -1,0 +1,32 @@
+# Licences accepted for the Rust crates linked into the app. `cargo about` fails
+# on any crate under a licence that is not listed here.
+accepted = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BlueOak-1.0.0",
+    "BSL-1.0",
+    "CC0-1.0",
+    "ISC",
+    "LGPL-2.1",
+    "LGPL-3.0",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "OpenSSL",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+]
+# Only what ships to users: build tooling and test crates are left out.
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+workarounds = ["ring"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+]

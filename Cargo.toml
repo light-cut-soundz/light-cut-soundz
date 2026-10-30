@@ -1,0 +1,14 @@
+[workspace]
+members = ["src-tauri"]
+resolver = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+# Decoding and resampling are unusably slow unoptimised (a 5 min MP3 takes
+# 15 s to decode, a speed change a minute), so dependencies are always
+# optimised, even for `tauri dev`.
+[profile.dev.package."*"]
+opt-level = 3

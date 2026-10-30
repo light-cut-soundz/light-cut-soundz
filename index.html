@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LightCutSoundz</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="hidden">
+      <div id="file-badge" class="file-badge hidden">
+        <span id="badge-name"></span>
+        <span id="badge-meta"></span>
+      </div>
+      <div class="header-actions">
+        <button id="undo-btn" class="btn-ghost btn-icon" disabled data-i18n-title="header.undo" data-i18n-aria="header.undo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+          </svg>
+        </button>
+        <button id="redo-btn" class="btn-ghost btn-icon" disabled data-i18n-title="header.redo" data-i18n-aria="header.redo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/>
+          </svg>
+        </button>
+        <button id="open-btn-header" class="btn-ghost hidden" data-i18n-title="header.openOther" data-i18n="header.open">Open an audio file</button>
+        <button id="export-open-btn" class="btn-primary" data-i18n="export.run">Export</button>
+      </div>
+    </header>
+
+    <!-- Drop zone -->
+    <section id="drop-zone" class="drop-zone">
+      <div class="drop-inner">
+        <div class="drop-frame">
+          <svg class="drop-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z"/>
+          </svg>
+          <h2 class="drop-name">LightCut<span class="drop-name-accent">Soundz</span></h2>
+          <p class="drop-subtitle" data-i18n="drop.title">Drop an audio file here</p>
+          <p class="drop-or" data-i18n="drop.or">or</p>
+          <button id="open-btn" class="drop-btn" data-i18n="drop.open">Browse files</button>
+        </div>
+        <section id="recent" class="recent hidden">
+          <div class="recent-head">
+            <h3 data-i18n="recent.title">Recent</h3>
+            <button id="recent-clear" class="recent-clear" data-i18n="recent.clear">Clear</button>
+          </div>
+          <ul id="recent-list"></ul>
+        </section>
+        <p class="drop-formats">MP3 · WAV · FLAC · OGG · AAC · M4A · AIFF</p>
+      </div>
+    </section>
+
+    <!-- Editor (hidden until file loaded) -->
+    <section id="editor" class="editor hidden">
+
+      <div class="main-area">
+        <!-- Visualisation: what the player shows in place of a video -->
+        <div class="viz-wrapper">
+          <canvas id="spectrum" aria-hidden="true"></canvas>
+        </div>
+
+        <!-- Settings -->
+        <aside class="sidebar">
+      <div class="side-section">
+        <div class="side-title">
+          <span data-i18n="fade.title">Fade</span>
+        </div>
+        <div class="side-body">
+          <div class="field-row">
+            <label for="fadein" data-i18n="fade.in">Fade in</label>
+            <input type="range" id="fadein" min="0" max="10" step="0.1" value="0">
+            <span class="range-val" id="fadein-val">0s</span>
+          </div>
+          <div class="field-row">
+            <label for="fadeout" data-i18n="fade.out">Fade out</label>
+            <input type="range" id="fadeout" min="0" max="10" step="0.1" value="0">
+            <span class="range-val" id="fadeout-val">0s</span>
+          </div>
+          <div class="curve-row">
+            <label for="fade-curve" data-i18n="fade.curve">Curve</label>
+            <div class="stab-options" role="group" data-i18n-aria="fade.curve">
+              <button class="stab-btn active" data-for="fade-curve" data-value="linear" aria-pressed="true" data-i18n="fade.linear">Linear</button>
+              <button class="stab-btn" data-for="fade-curve" data-value="equal-power" aria-pressed="false" data-i18n="fade.equalPower">Equal power</button>
+            </div>
+            <select id="fade-curve" class="hidden">
+              <option value="linear" data-i18n="fade.linear">Linear</option>
+              <option value="equal-power" data-i18n="fade.equalPower">Equal power</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-section">
+        <div class="side-title">
+          <span data-i18n="volume.title">Volume</span>
+        </div>
+        <div class="side-body">
+          <label class="checkbox-row">
+            <input type="checkbox" id="normalize">
+            <span data-i18n="volume.normalize">Normalise (peak −1 dBFS)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="side-section">
+        <div class="side-title">
+          <span data-i18n="speed.title">Speed</span>
+        </div>
+        <div class="side-body speed-body">
+          <div class="speed-display" id="speed-val">1x</div>
+          <input type="range" id="speed" class="speed-slider" min="0" max="8" step="1" value="3" data-i18n-aria="speed.title">
+          <div class="speed-labels"><span>0.25x</span><span>4x</span></div>
+          <div class="speed-presets">
+            <button class="preset" data-v="0.25" aria-pressed="false">0.25x</button>
+            <button class="preset" data-v="0.5" aria-pressed="false">0.5x</button>
+            <button class="preset" data-v="0.75" aria-pressed="false">0.75x</button>
+            <button class="preset active" data-v="1.0" aria-pressed="true">1x</button>
+            <button class="preset" data-v="1.25" aria-pressed="false">1.25x</button>
+            <button class="preset" data-v="1.5" aria-pressed="false">1.5x</button>
+            <button class="preset" data-v="2.0" aria-pressed="false">2x</button>
+            <button class="preset" data-v="3.0" aria-pressed="false">3x</button>
+            <button class="preset" data-v="4.0" aria-pressed="false">4x</button>
+          </div>
+        </div>
+      </div>
+      <div class="side-section">
+        <div class="side-title">
+          <span data-i18n="filter.title">Filter</span>
+        </div>
+        <div class="side-body">
+          <div class="stab-options" role="group" data-i18n-aria="filter.title">
+            <button class="stab-btn active" data-for="filter-type" data-value="" aria-pressed="true" data-i18n="filter.none">None</button>
+            <button class="stab-btn" data-for="filter-type" data-value="lowpass" aria-pressed="false" data-i18n="filter.lowpass">Low-pass</button>
+            <button class="stab-btn" data-for="filter-type" data-value="highpass" aria-pressed="false" data-i18n="filter.highpass">High-pass</button>
+            <button class="stab-btn" data-for="filter-type" data-value="bandpass" aria-pressed="false" data-i18n="filter.bandpass">Band-pass</button>
+          </div>
+          <!-- What the buttons set, and what the rest of the app reads. -->
+          <select id="filter-type" class="hidden" data-i18n-aria="filter.title">
+            <option value="" data-i18n="filter.none">None</option>
+            <option value="lowpass" data-i18n="filter.lowpass">Low-pass</option>
+            <option value="highpass" data-i18n="filter.highpass">High-pass</option>
+            <option value="bandpass" data-i18n="filter.bandpass">Band-pass</option>
+          </select>
+          <div id="filter-params" class="hidden">
+            <div class="field-row">
+              <label id="filter-freq-label" for="filter-freq" data-i18n="filter.frequency">Frequency</label>
+              <div class="input-unit">
+                <input type="number" id="filter-freq" value="1000" min="1" step="100">
+                <span>Hz</span>
+              </div>
+            </div>
+            <div class="field-row" id="filter-slope-row">
+              <label for="filter-slope" data-i18n="filter.slope">Slope</label>
+              <select id="filter-slope">
+                <option value="12">12 dB/oct</option>
+                <option value="24">24 dB/oct</option>
+                <option value="36">36 dB/oct</option>
+                <option value="48">48 dB/oct</option>
+              </select>
+            </div>
+            <div class="field-row" id="filter-q-row">
+              <label for="filter-q" data-i18n="filter.q">Q</label>
+              <div class="input-unit">
+                <input type="number" id="filter-q" value="0.707" min="0.1" max="20" step="0.05">
+              </div>
+            </div>
+            <div class="field-row" id="filter-bw-row" style="display:none">
+              <label for="filter-bw" data-i18n="filter.bandwidth">Bandwidth</label>
+              <div class="input-unit">
+                <input type="number" id="filter-bw" value="500" min="1" step="50">
+                <span>Hz</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="side-section">
+        <div class="side-title">
+          <span data-i18n="cut.title">CUTS</span>
+        </div>
+        <p class="side-hint" data-i18n="cut.sideHint">On the timeline below, drag to select the parts to remove. Several selections are possible.</p>
+        <div id="side-cut-count" class="side-count hidden"></div>
+      </div>
+        </aside>
+      </div>
+
+      <!-- Seek bar and transport -->
+      <div class="player-controls">
+        <div id="seekbar" class="seekbar" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" data-i18n-aria="player.seek">
+          <div class="seekbar-track">
+            <div id="seekbar-fill" class="seekbar-fill"></div>
+            <div id="seekbar-thumb" class="seekbar-thumb"><span id="seekbar-tooltip" class="seekbar-tooltip"></span></div>
+          </div>
+        </div>
+        <div class="controls-row">
+          <button id="play-btn" class="play-btn" data-i18n-title="player.playPause" data-i18n-aria="player.playPause">
+            <svg id="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+          <span class="vc-time">
+            <span id="time-current" class="mono">0:00</span><span class="time-sep"> / </span><span id="time-total" class="mono">0:00</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Timeline: the waveform, where the parts to remove are marked -->
+      <div class="timeline-section">
+        <div class="tl-header">
+          <span class="tl-label" data-i18n="cut.title">CUTS</span>
+          <span id="cut-count" class="tl-cut-count hidden"></span>
+          <button id="cut-clear" class="tl-clear-btn hidden" data-i18n="cut.clear">Clear all</button>
+          <span class="tl-hint" data-i18n="cut.hint">Drag on the track to mark the parts to remove</span>
+        </div>
+        <div id="tl-track" class="tl-track">
+          <div id="tl-ruler" class="tl-ruler"></div>
+          <div id="tl-body" class="tl-body">
+            <canvas id="waveform" role="img" tabindex="0" data-i18n-aria="player.waveform"></canvas>
+            <div id="tl-cuts" class="tl-cuts"></div>
+          </div>
+        </div>
+        <div class="cut-editor">
+          <span class="cut-editor-label" data-i18n="cut.selected">Selected cut:</span>
+          <span id="cut-placeholder" class="cut-editor-placeholder" data-i18n="cut.placeholder">Click a cut to edit its times</span>
+          <div id="cut-fields" class="cut-editor-fields hidden">
+            <label class="cut-editor-field"><span data-i18n="cut.start">Start</span><input id="cut-start" class="cut-editor-input" title="M:SS.s" spellcheck="false"></label>
+            <span class="cut-editor-arrow">→</span>
+            <label class="cut-editor-field"><span data-i18n="cut.end">End</span><input id="cut-end" class="cut-editor-input" title="M:SS.s" spellcheck="false"></label>
+            <span id="cut-length" class="cut-editor-dur"></span>
+            <button id="cut-delete" class="cut-editor-delete" data-i18n="cut.delete">Delete cut</button>
+          </div>
+        </div>
+      </div>
+
+    </section><!-- /editor -->
+
+    <!-- Export dialog -->
+    <div id="export-modal" class="modal-backdrop hidden">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
+        <div class="modal-header">
+          <h2 id="export-title" data-i18n="export.title">Export</h2>
+          <button id="export-close" class="modal-close" data-i18n-aria="export.close" data-i18n-title="export.close">×</button>
+        </div>
+        <div class="format-grid">
+          <button class="fmt active" data-fmt="wav" aria-pressed="true">WAV</button>
+          <button class="fmt" data-fmt="mp3" aria-pressed="false">MP3</button>
+          <button class="fmt" data-fmt="flac" aria-pressed="false">FLAC</button>
+          <button class="fmt" data-fmt="ogg" aria-pressed="false">OGG</button>
+          <button class="fmt" data-fmt="m4a" aria-pressed="false">M4A</button>
+        </div>
+        <div id="depth-row" class="opt-row">
+          <label for="wav-depth" data-i18n="export.depth">WAV sample format</label>
+          <select id="wav-depth" class="depth-select" data-i18n-aria="export.depth">
+            <option value="float32" data-i18n="depth.float32">32-bit float</option>
+            <option value="pcm24" data-i18n="depth.pcm24">24-bit</option>
+            <option value="pcm16" data-i18n="depth.pcm16">16-bit (dithered)</option>
+          </select>
+        </div>
+        <div id="export-progress" class="export-progress hidden">
+          <div class="progress-bar"><div id="export-progress-fill" class="progress-fill"></div></div>
+        </div>
+        <span id="export-hint" class="export-hint" role="status"></span>
+        <div class="modal-actions">
+          <button id="export-dismiss" class="btn-ghost" data-i18n="export.cancel">Cancel</button>
+          <button id="cancel-btn" class="btn-ghost hidden" data-i18n="export.cancel">Cancel</button>
+          <button id="export-btn" class="btn-export">
+            <span id="export-label" data-i18n="export.run">Export</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+  </div><!-- /app -->
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
