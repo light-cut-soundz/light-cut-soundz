@@ -7,7 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.js'],
     coverage: {
-      // Only the app's own sources count. `docs/` is the GitHub Pages landing page.
+      // Only the app's own sources count.
       include: ['src/**/*.js'],
       exclude: ['src/**/*.test.js'],
     },
