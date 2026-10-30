@@ -3437,7 +3437,7 @@ describe('main — changelog', () => {
     expect(dialog.querySelector('#changelog-title').textContent).toBe('What’s new')
     const titles = [...dialog.querySelectorAll('h3')].map((h) => h.textContent)
     // Nothing is unreleased right after a release: the newest entry leads.
-    expect(titles[0]).toBe('v1.2.0' + '2026-10-28')
+    expect(titles[0]).toBe('v1.2.1' + '2026-10-30')
     expect(titles).toContain('v1.0.0' + '2026-08-19')
   })
 
@@ -3465,7 +3465,7 @@ describe('main — changelog', () => {
 
     const dialog = document.querySelector('#changelog-dialog')
     expect(dialog.querySelector('#changelog-title').textContent).toBe('Nouveautés')
-    expect(dialog.querySelector('h3').textContent).toBe('v1.2.0' + '2026-10-28')
+    expect(dialog.querySelector('h3').textContent).toBe('v1.2.1' + '2026-10-30')
     expect([...dialog.querySelectorAll('h4')].map((h) => h.textContent)).toContain('Ajouté')
   })
 

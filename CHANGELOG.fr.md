@@ -6,6 +6,11 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le pr
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-30
+
+### Modifié
+- Nouvelle icône de l'application, issue de la famille de logos renouvelée de Light App Suite.
+
 ## [1.2.0] - 2026-10-28
 
 ### Ajouté
