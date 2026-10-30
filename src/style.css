@@ -160,6 +160,10 @@ header {
 
 .drop-icon { color: var(--accent); margin-bottom: 8px; opacity: 0.9; }
 
+.drop-name-accent {
+  color: var(--accent);
+}
+
 .drop-name {
   font-size: 28px;
   font-weight: 700;
