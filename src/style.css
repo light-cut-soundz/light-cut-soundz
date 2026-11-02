@@ -300,7 +300,6 @@ header {
   transform: translateX(-50%);
 }
 .seekbar.hover .seekbar-tooltip { display: block; }
-.seekbar:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
 
 .controls-row { display: flex; align-items: center; gap: 10px; }
 .vc-time { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
@@ -820,18 +819,12 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 /* ─── Keyboard focus ──────────────────────────────────────────────────────── */
 
-/* Fields drop the browser outline for a border colour; everything else needs a
-   visible ring, and the visually hidden checkbox of the toggle must show one on
-   its track. Buttons show no ring. */
-select:focus-visible,
-input[type="range"]:focus-visible,
-input[type="checkbox"]:focus-visible,
-#waveform:focus-visible {
-  outline: 2px solid var(--accent-light);
-  outline-offset: 2px;
+/* No focus ring anywhere. */
+:focus-visible {
+  outline: none;
 }
-input[type="number"]:focus-visible { border-color: var(--accent-light); box-shadow: 0 0 0 2px var(--accent-dim); }
-.input-unit:focus-within { border-color: var(--accent-light); box-shadow: 0 0 0 2px var(--accent-dim); }
+input[type="number"]:focus-visible { border-color: var(--accent-light); }
+.input-unit:focus-within { border-color: var(--accent-light); }
 
 /* A field the export would be refused for. */
 [aria-invalid="true"],
@@ -877,7 +870,6 @@ input[type="number"]:focus-visible { border-color: var(--accent-light); box-shad
   line-height: 1.5;
   user-select: text;
 }
-.changelog-body:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
 .changelog-body h3 { font-size: 14px; margin: 14px 0 4px; }
 .changelog-body h3:first-child { margin-top: 0; }
 .changelog-body h3 small { margin-left: 8px; font-weight: 400; opacity: 0.5; }
