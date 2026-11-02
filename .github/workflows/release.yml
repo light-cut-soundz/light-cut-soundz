@@ -98,6 +98,17 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v4
+      # The updater reads the notes it shows ("What's new") from latest.json, and
+      # tauri-action leaves that field empty.
+      - name: Put the release notes in latest.json
+        run: |
+          VERSION="${TAG#v}"
+          bash scripts/release-notes.sh "$VERSION" > notes.txt
+          gh release download "$TAG" -R "$GITHUB_REPOSITORY" --pattern latest.json
+          jq --rawfile notes notes.txt '.notes = $notes' latest.json > latest.new.json
+          mv latest.new.json latest.json
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" latest.json --clobber
       # install.sh and the in-app updater verify downloads against this file.
       - name: Hash every installable file of the release
         run: |

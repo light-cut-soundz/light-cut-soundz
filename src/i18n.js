@@ -84,8 +84,8 @@ const dict = {
     // Updates
     'update.checking': 'Checking for updates…',
     'update.upToDate': 'LightCutSoundz is up to date',
-    'update.available': 'Version {version} is available',
-    'update.install': 'Install and restart',
+    'update.available': 'Version {version} is available.',
+    'update.install': 'Update and restart',
     'update.notes': 'What’s new',
     'update.hideNotes': 'Hide',
     'update.later': 'Later',
@@ -225,8 +225,8 @@ const dict = {
     // Updates
     'update.checking': 'Recherche de mises à jour…',
     'update.upToDate': 'LightCutSoundz est à jour',
-    'update.available': 'La version {version} est disponible',
-    'update.install': 'Installer et redémarrer',
+    'update.available': 'La version {version} est disponible.',
+    'update.install': 'Mettre à jour et redémarrer',
     'update.notes': 'Nouveautés',
     'update.hideNotes': 'Masquer',
     'update.later': 'Plus tard',

@@ -87,9 +87,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
+  box-sizing: border-box;
+  min-height: 37px;
   padding: 6px 24px;
-  background: rgba(124, 58, 237, 0.15);
-  border-bottom: 1px solid var(--accent-dim);
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   font-size: 12px;
   color: var(--accent-light);
   text-align: center;
@@ -97,8 +99,13 @@ body {
 }
 
 #update-banner button {
-  padding: 3px 12px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
   font-size: 12px;
+  line-height: 1;
 }
 
 /* Header */

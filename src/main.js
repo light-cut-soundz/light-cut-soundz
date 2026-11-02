@@ -1646,7 +1646,7 @@ function renderUpdateBanner() {
   if (phase === 'available') {
     const install = document.createElement('button')
     install.id = 'update-install'
-    install.className = 'btn-ghost'
+    install.className = 'btn-primary'
     install.textContent = tr('update.install')
     install.addEventListener('click', () => { void installUpdate() })
     const later = document.createElement('button')

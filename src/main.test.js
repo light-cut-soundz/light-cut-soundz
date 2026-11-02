@@ -2285,7 +2285,7 @@ describe('menu — update', () => {
     await menuHandlers['menu-set-language']({ payload: 'fr' })
 
     expect($('update-banner').textContent).toContain('La version 0.2.0 est disponible')
-    expect($('update-install').textContent).toBe('Installer et redémarrer')
+    expect($('update-install').textContent).toBe('Mettre à jour et redémarrer')
   })
 
   it('reports the failure when the check comes from the menu', async () => {
