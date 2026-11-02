@@ -822,8 +822,7 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
 /* Fields drop the browser outline for a border colour; everything else needs a
    visible ring, and the visually hidden checkbox of the toggle must show one on
-   its track. */
-button:focus-visible,
+   its track. Buttons show no ring. */
 select:focus-visible,
 input[type="range"]:focus-visible,
 input[type="checkbox"]:focus-visible,
