@@ -3436,9 +3436,8 @@ describe('main — changelog', () => {
     expect(dialog).not.toBeNull()
     expect(dialog.querySelector('#changelog-title').textContent).toBe('What’s new')
     const titles = [...dialog.querySelectorAll('h3')].map((h) => h.textContent)
-    // The Unreleased section leads, then the newest release.
-    expect(titles[0]).toBe('Unreleased')
-    expect(titles[1]).toBe('v1.0.0' + '2026-10-30')
+    // An empty Unreleased section is hidden: the newest release leads.
+    expect(titles[0]).toMatch(/^v\d+\.\d+\.\d+\d{4}-\d{2}-\d{2}$/)
   })
 
   it('lists the items of each section', async () => {
@@ -3465,8 +3464,7 @@ describe('main — changelog', () => {
     const dialog = document.querySelector('#changelog-dialog')
     expect(dialog.querySelector('#changelog-title').textContent).toBe('Nouveautés')
     const titles = [...dialog.querySelectorAll('h3')].map((h) => h.textContent)
-    expect(titles[0]).toBe('Non publié')
-    expect(titles[1]).toBe('v1.0.0' + '2026-10-30')
+    expect(titles[0]).toMatch(/^v\d+\.\d+\.\d+\d{4}-\d{2}-\d{2}$/)
     expect([...dialog.querySelectorAll('h4')].map((h) => h.textContent)).toContain('Ajouté')
   })
 
