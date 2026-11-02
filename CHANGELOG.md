@@ -7,6 +7,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-11-02
+
+### Changed
+
+- The update bar looks the same in every app: same height, same wording, same order of buttons.
+
+### Fixed
+
+- “What’s new” is shown again in the update bar.
+
 ## [1.0.1] - 2026-11-02
 
 ### Changed
